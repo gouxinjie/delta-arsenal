@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #12141a;
+  --panel: #1b1f29;
+  --panel-hi: #212736;
+  --border: #2a3040;
+  --border-hi: #3a4256;
+  --text: #e8eaed;
+  --muted: #8a93a6;
+  --accent: #ff9e2c;
+  --accent-dim: rgba(255, 158, 44, 0.12);
+  --info: #4da3ff;
+  --t1: #9aa3b2;
+  --t2: #3fbf62;
+  --t3: #3d8be8;
+  --t4: #a45fe0;
+  --t5: #f2b23e;
+  --danger: #e5484d;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-hi: var(--panel-hi);
+  --color-edge: var(--border);
+  --color-main: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-info: var(--info);
+  --color-t1: var(--t1);
+  --color-t2: var(--t2);
+  --color-t3: var(--t3);
+  --color-t4: var(--t4);
+  --color-t5: var(--t5);
+  --color-danger: var(--danger);
+  --font-mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+
+body {
+  background:
+    radial-gradient(1200px 500px at 70% -10%, rgba(255, 158, 44, 0.05), transparent 60%),
+    radial-gradient(900px 400px at 10% 0%, rgba(77, 163, 255, 0.04), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 路由切换动效 ---------- */
+@keyframes routeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.route-anim {
+  animation: routeIn 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.anim-fade { animation: fadeIn 0.2s ease-out; }
+.anim-slide { animation: slideInRight 0.28s cubic-bezier(0.22, 0.61, 0.36, 1); }
+
+/* ---------- 战术面板 ---------- */
+.tac-panel {
+  background: linear-gradient(180deg, var(--panel-hi) 0%, var(--panel) 60%);
+  border: 1px solid var(--border);
+  position: relative;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+/* 左上 + 右上 橙色切角线条 */
+.tac-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 26px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  pointer-events: none;
+}
+.tac-panel::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 1px;
+  background: linear-gradient(270deg, var(--accent), transparent);
+  pointer-events: none;
+}
+.tac-panel:hover {
+  border-color: var(--border-hi);
+}
+
+/* 可点击卡片：hover 抬升 + 橙光 */
+.tac-hover:hover {
+  border-color: rgba(255, 158, 44, 0.6) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 158, 44, 0.15);
+}
+
+/* ---------- 首页 Hero 网格底纹 ---------- */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(255, 158, 44, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 158, 44, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 80% 100% at 50% 0%, black 30%, transparent 75%);
+}
+
+/* ---------- 徽章 / 筛选 ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+select {
+  appearance: none;
+  background-color: var(--bg);
+  color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 55%, calc(100% - 11px) 55%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+select:hover {
+  border-color: var(--border-hi);
+}
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(255, 158, 44, 0.35);
+  outline: none;
+}
+option {
+  background-color: var(--panel);
+  color: var(--text);
+}
+
+/* ---------- 表格 ---------- */
+table.matrix-table td,
+table.matrix-table th {
+  border-color: var(--border);
+}
+
+/* ---------- 滚动条 ---------- */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }

@@ -1,0 +1,8 @@
+node_modules/
+tmp/
+data/*.db-journal
+data/*.db-shm
+data/*.db-wal
+.next/
+.env*
+.DS_Store
