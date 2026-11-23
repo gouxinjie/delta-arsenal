@@ -38,6 +38,71 @@ interface AmmoItem {
 const TIER_COLOR = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
 const RARITY_LABEL: Record<string, string> = { 白: '白弹', 绿: '绿弹', 蓝: '蓝弹', 紫: '紫弹', 橙: '金弹', 金: '金弹' };
 
+/**
+ * 弹药图标（子弹形状内联 SVG）
+ * @param className - 尺寸等样式类
+ * @param color - 颜色（默认跟随当前文字色）
+ */
+function AmmoIcon({ className, color }: { className?: string; color?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      style={color ? { color } : undefined}
+      aria-hidden="true"
+    >
+      {/* 弹头（锥形，尖朝上） */}
+      <path d="M7 1.5h10L14 7h-4L7 1.5z" />
+      {/* 弹壳（圆柱） */}
+      <rect x="9" y="7" width="6" height="16" rx="1.5" />
+    </svg>
+  );
+}
+
+/** 口径 -> 本地弹药贴图路径（playerhub 官方贴图，按口径区分） */
+const CALIBER_ICON: Record<string, string> = {
+  '.300BLK': '/img/ammo/300BLK.png',
+  '.338 Lap Mag': '/img/ammo/338.png',
+  '.357 Magnum': '/img/ammo/.357.png',
+  '.45ACP': '/img/ammo/45-ACP.png',
+  '.50AE': '/img/ammo/50-AE.png',
+  '12.7x55': '/img/ammo/12.7x55.png',
+  '12Gauge': '/img/ammo/12-Gauge.png',
+  '4.6x30mm': '/img/ammo/4.6x30mm.png',
+  '5.45x39mm': '/img/ammo/5.45x39mm.png',
+  '5.56x45mm': '/img/ammo/5.56x45mm.png',
+  '5.7x28mm': '/img/ammo/5.7x28mm.png',
+  '5.8x42mm': '/img/ammo/5.8x42mm.png',
+  '6.8x51mm': '/img/ammo/6.8x51mm.png',
+  '7.62x39mm': '/img/ammo/7.62x39mm.png',
+  '7.62x51mm': '/img/ammo/7.62x51mm.png',
+  '7.62x54R': '/img/ammo/7.62x54mm.png',
+  '9x19mm': '/img/ammo/9x19mm.png',
+  '9x39mm': '/img/ammo/9x39mm.png',
+};
+
+/**
+ * 口径图标：优先使用官方真实贴图，无贴图时回退到子弹 SVG
+ * @param caliber - 口径名（数据源原始值）
+ * @param className - 尺寸等样式类
+ */
+function CaliberIcon({ caliber, className }: { caliber: string; className?: string }) {
+  const src = CALIBER_ICON[caliber];
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={caliber}
+        loading="lazy"
+        className={`${className ?? ''} object-contain shrink-0`}
+        onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
+      />
+    );
+  }
+  return <AmmoIcon className={className} />;
+}
+
 function TierBadge({ a }: { a: AmmoItem }) {
   const color = a.tier ? TIER_COLOR[a.tier - 1] : 'var(--t1)';
   return (
@@ -154,6 +219,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
         {grouped.map(([cal, list]) => (
           <section key={cal} className="tac-panel overflow-hidden">
             <h2 className="num text-sm text-accent px-4 py-2.5 border-b border-edge flex items-center gap-2">
+              <CaliberIcon caliber={cal} className="w-5 h-5" />
               {cal}
               <span className="text-muted">({list.length} 种)</span>
               <span className="flex-1" />
@@ -181,9 +247,9 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                     >
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
-                          <span
-                            className="w-1 h-6 rounded-sm shrink-0"
-                            style={{ background: a.tier ? TIER_COLOR[a.tier - 1] : 'var(--t1)' }}
+                          <AmmoIcon
+                            className="w-4 h-4 shrink-0"
+                            color={a.tier ? TIER_COLOR[a.tier - 1] : 'var(--t1)'}
                           />
                           <div>
                             <div className="flex items-center gap-2">

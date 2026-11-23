@@ -21,8 +21,19 @@ const NAV = [
 
 export default function Header() {
   const pathname = usePathname();
-  const isActive = (href: string) =>
-    href === '/ammo/matrix' ? pathname === href : pathname.startsWith(href) && href !== '/ammo/matrix';
+  /**
+   * 判断导航项是否为当前页
+   * @param href - 导航项路径
+   * @returns 路径精确等于 href，或位于其子路径下且没有更具体的导航项可归属时为 true
+   */
+  const isActive = (href: string) => {
+    if (pathname === href) return true;
+    if (!pathname.startsWith(`${href}/`)) return false;
+    // 子路径已被更具体的导航项覆盖时（如 /ammo/matrix 归"穿甲对照"），不再高亮当前项
+    return !NAV.some(
+      (n) => n.href !== href && (pathname === n.href || pathname.startsWith(`${n.href}/`))
+    );
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-edge bg-bg/90 backdrop-blur-md">

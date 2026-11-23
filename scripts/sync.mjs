@@ -227,6 +227,34 @@ async function main() {
   })();
   console.log(`  图片: 新下载 ${imgOk} | 已存在 ${imgSkip} | 失败 ${imgFail}`);
 
+  // ---- 5.7 弹药口径图标本地化（playerhub 官方贴图，按口径区分）----
+  // 数据源 ammo.json 无图标字段，图标按口径从 playerhub 拉取，本地化避免热链
+  const AMMO_ICON_MAP = {
+    '.300BLK': '300BLK', '.338 Lap Mag': '338', '.357 Magnum': '.357',
+    '.45ACP': '45-ACP', '.50AE': '50-AE', '12.7x55': '12.7x55',
+    '12Gauge': '12-Gauge', '4.6x30mm': '4.6x30mm', '5.45x39mm': '5.45x39mm',
+    '5.56x45mm': '5.56x45mm', '5.7x28mm': '5.7x28mm', '5.8x42mm': '5.8x42mm',
+    '6.8x51mm': '6.8x51mm', '7.62x39mm': '7.62x39mm', '7.62x51mm': '7.62x51mm',
+    '7.62x54R': '7.62x54mm', '9x19mm': '9x19mm', '9x39mm': '9x39mm',
+  };
+  const AMMO_IMG_DIR = path.join(ROOT, 'public', 'img', 'ammo');
+  fs.mkdirSync(AMMO_IMG_DIR, { recursive: true });
+  let ammoImgOk = 0, ammoImgSkip = 0, ammoImgFail = 0;
+  for (const [caliber, file] of Object.entries(AMMO_ICON_MAP)) {
+    const dest = path.join(AMMO_IMG_DIR, `${file}.png`);
+    if (fs.existsSync(dest) && fs.statSync(dest).size > 0) { ammoImgSkip++; continue; }
+    try {
+      const res = await fetch(`https://playerhub.df.qq.com/playerhub/60004/object/gun/ammo/${file}.png`, { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+      ammoImgOk++;
+    } catch (e) {
+      ammoImgFail++;
+      console.warn(`  [WARN] 弹药图标下载失败 ${caliber}: ${e.message}`);
+    }
+  }
+  console.log(`  弹药图标: 新下载 ${ammoImgOk} | 已存在 ${ammoImgSkip} | 失败 ${ammoImgFail}`);
+
   // ---- 5.6 生成搜索索引（前端内存检索用）----
   const PUBLIC_DIR = path.join(ROOT, 'public');
   fs.mkdirSync(PUBLIC_DIR, { recursive: true });
