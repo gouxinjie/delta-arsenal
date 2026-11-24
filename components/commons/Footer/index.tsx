@@ -19,7 +19,7 @@ export default function Footer({ meta, counts }: FooterProps) {
   const updated = meta.generatedAt ? new Date(meta.generatedAt).toLocaleDateString('zh-CN') : '—';
   return (
     <footer className="border-t border-edge mt-10">
-      <div className="max-w-6xl mx-auto px-4 py-6 text-xs text-muted space-y-2">
+      <div className="max-w-[1200px] mx-auto px-4 py-6 text-xs text-muted space-y-2">
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           <span className="num">
             数据版本 {meta.season ?? '—'} · 更新于 {updated}

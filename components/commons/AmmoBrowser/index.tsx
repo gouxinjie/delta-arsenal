@@ -3,13 +3,14 @@
  * @description 弹药库浏览器：口径筛选 + 穿透/品阶筛选，按口径分组表格展示，行点击打开详情抽屉
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-23
+ * @updated 2026-11-24
  */
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { IconAmmo } from '@/components/commons/icons';
 
 /** 弹药展示模型（来自 lib/db 的 getAmmoWithWeapons 聚合结果） */
 interface AmmoItem {
@@ -36,35 +37,13 @@ interface AmmoItem {
 }
 
 const TIER_COLOR = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
-const RARITY_LABEL: Record<string, string> = { 白: '白弹', 绿: '绿弹', 蓝: '蓝弹', 紫: '紫弹', 橙: '金弹', 金: '金弹' };
-
-/**
- * 弹药图标（子弹形状内联 SVG）
- * @param className - 尺寸等样式类
- * @param color - 颜色（默认跟随当前文字色）
- */
-function AmmoIcon({ className, color }: { className?: string; color?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className={className}
-      style={color ? { color } : undefined}
-      aria-hidden="true"
-    >
-      {/* 弹头（锥形，尖朝上） */}
-      <path d="M7 1.5h10L14 7h-4L7 1.5z" />
-      {/* 弹壳（圆柱） */}
-      <rect x="9" y="7" width="6" height="16" rx="1.5" />
-    </svg>
-  );
-}
+const RARITY_LABEL: Record<string, string> = { 白: '白弹', 绿: '绿弹', 蓝: '蓝弹', 紫: '紫弹', 橙: '金弹', 金: '金弹', 红: '专属弹' };
 
 /** 口径 -> 本地弹药贴图路径（playerhub 官方贴图，按口径区分） */
 const CALIBER_ICON: Record<string, string> = {
   '.300BLK': '/img/ammo/300BLK.png',
   '.338 Lap Mag': '/img/ammo/338.png',
-  '.357 Magnum': '/img/ammo/.357.png',
+  '.357 Magnum': '/img/ammo/357.png',
   '.45ACP': '/img/ammo/45-ACP.png',
   '.50AE': '/img/ammo/50-AE.png',
   '12.7x55': '/img/ammo/12.7x55.png',
@@ -100,9 +79,10 @@ function CaliberIcon({ caliber, className }: { caliber: string; className?: stri
       />
     );
   }
-  return <AmmoIcon className={className} />;
+  return <IconAmmo className={className} />;
 }
 
+/** 品阶徽章 */
 function TierBadge({ a }: { a: AmmoItem }) {
   const color = a.tier ? TIER_COLOR[a.tier - 1] : 'var(--t1)';
   return (
@@ -112,12 +92,14 @@ function TierBadge({ a }: { a: AmmoItem }) {
   );
 }
 
+/** 穿透等级数字卡片（醒目） */
 function PenBadge({ pen }: { pen: number }) {
-  const color = pen >= 6 ? 'var(--danger)' : pen >= 5 ? 'var(--t5)' : pen >= 4 ? 'var(--t4)' : pen >= 3 ? 'var(--t3)' : pen >= 2 ? 'var(--t2)' : 'var(--t1)';
+  const color =
+    pen >= 6 ? 'var(--danger)' : pen >= 5 ? 'var(--t5)' : pen >= 4 ? 'var(--t4)' : pen >= 3 ? 'var(--t3)' : pen >= 2 ? 'var(--t2)' : 'var(--t1)';
   return (
     <span
-      className="num font-bold text-lg w-8 h-8 inline-flex items-center justify-center rounded border"
-      style={{ color, borderColor: color, background: 'rgba(0,0,0,0.25)' }}
+      className="num font-bold text-lg w-9 h-9 inline-flex items-center justify-center rounded border"
+      style={{ color, borderColor: color, background: 'rgba(0,0,0,0.3)', boxShadow: `0 0 12px ${color}22` }}
       title={`穿透等级 ${pen} 级`}
     >
       {pen}
@@ -125,14 +107,16 @@ function PenBadge({ pen }: { pen: number }) {
   );
 }
 
+/** 伤害倍率进度条（数值 + 封顶进度条） */
 function DmgBar({ ratio, color }: { ratio: number; color: string }) {
+  const pct = Math.round(ratio * 100);
   return (
-    <div className="flex items-center gap-2">
-      <span className="num text-sm font-semibold" style={{ color }}>
-        {Math.round(ratio * 100)}%
+    <div className="flex items-center gap-2.5">
+      <span className="num text-sm font-semibold w-10 text-right shrink-0" style={{ color }}>
+        {pct}%
       </span>
-      <div className="hidden lg:block w-14 h-1 bg-bg rounded overflow-hidden">
-        <div className="h-full rounded" style={{ width: `${Math.min(ratio * 100, 140) / 1.4}%`, background: color }} />
+      <div className="hidden lg:block w-16 h-1.5 bg-bg rounded overflow-hidden">
+        <div className="h-full rounded" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
       </div>
     </div>
   );
@@ -171,16 +155,19 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
     return [...map.entries()];
   }, [filtered]);
 
+  const filterGroups = [
+    { label: '口径', value: caliber, set: setCaliber, opts: calibers },
+    { label: '穿透等级', value: pen, set: setPen, opts: ['全部', '0', '1', '2', '3', '4', '5', '6', '7'] },
+    { label: '品阶', value: tier, set: setTier, opts: ['全部', '1', '2', '3', '4', '5'] },
+  ];
+
   return (
-    <div className="flex flex-col md:flex-row gap-4">
-      {/* 筛选栏 */}
+    <div className="flex flex-col md:flex-row gap-5">
+      {/* 筛选面板 */}
       <aside className="md:w-48 md:shrink-0 md:sticky md:top-20 self-start">
-        <div className="tac-panel p-3 space-y-3">
-          {[
-            { label: '口径', value: caliber, set: setCaliber, opts: calibers },
-            { label: '穿透等级', value: pen, set: setPen, opts: ['全部', '0', '1', '2', '3', '4', '5', '6', '7'] },
-            { label: '品阶', value: tier, set: setTier, opts: ['全部', '1', '2', '3', '4', '5'] },
-          ].map((f) => (
+        <div className="tac-panel rounded-lg p-3.5 space-y-4">
+          <h2 className="text-[11px] tracking-[0.2em] text-muted uppercase border-b border-edge pb-2">筛选条件</h2>
+          {filterGroups.map((f) => (
             <label key={f.label} className="block">
               <span className="text-xs text-muted">{f.label}</span>
               <select
@@ -206,8 +193,8 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
           >
             重置筛选
           </button>
-          <p className="num text-[11px] text-muted leading-relaxed pt-1 border-t border-edge">
-            共 {filtered.length} 种
+          <p className="num text-[11px] text-muted leading-relaxed pt-2 border-t border-edge">
+            共 <b className="text-accent">{filtered.length}</b> 种
             <br />
             穿透等级即玩家俗称的「N级弹」
           </p>
@@ -215,27 +202,27 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
       </aside>
 
       {/* 分组表格 */}
-      <div className="flex-1 space-y-6">
+      <div className="flex-1 space-y-6 min-w-0">
         {grouped.map(([cal, list]) => (
-          <section key={cal} className="tac-panel overflow-hidden">
-            <h2 className="num text-sm text-accent px-4 py-2.5 border-b border-edge flex items-center gap-2">
+          <section key={cal} className="tac-panel rounded-lg overflow-hidden">
+            <h2 className="num text-sm text-accent px-4 py-3 border-b border-edge flex items-center gap-2">
               <CaliberIcon caliber={cal} className="w-5 h-5" />
               {cal}
-              <span className="text-muted">({list.length} 种)</span>
+              <span className="badge text-muted">{list.length} 种</span>
               <span className="flex-1" />
-              <Link href="/ammo/matrix" className="text-[11px] text-muted hover:text-accent">
+              <Link href="/ammo/matrix" className="text-[11px] text-muted hover:text-accent transition-colors">
                 穿甲对照 →
               </Link>
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
-                  <tr className="text-xs text-muted">
-                    <th className="px-4 py-2 text-left font-normal">弹药（口径 + 型号）</th>
-                    <th className="px-3 py-2 text-center font-normal">穿透</th>
-                    <th className="px-3 py-2 text-left font-normal">肉体伤害</th>
-                    <th className="px-3 py-2 text-left font-normal">护甲伤害</th>
-                    <th className="px-4 py-2 text-right font-normal">适用枪械</th>
+                  <tr className="text-xs text-muted border-b border-edge">
+                    <th className="px-4 py-2.5 text-left font-normal">弹药（口径 + 型号）</th>
+                    <th className="px-3 py-2.5 text-center font-normal">穿透</th>
+                    <th className="px-3 py-2.5 text-left font-normal">肉体伤害</th>
+                    <th className="px-3 py-2.5 text-left font-normal">护甲伤害</th>
+                    <th className="px-4 py-2.5 text-right font-normal">适用枪械</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -243,14 +230,13 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                     <tr
                       key={a.id}
                       onClick={() => setSelected(a)}
-                      className="border-t border-edge cursor-pointer hover:bg-panel-hi/60 transition-colors"
+                      className="border-b border-edge/60 last:border-0 cursor-pointer hover:bg-panel-hi/60 transition-colors"
                     >
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <AmmoIcon
-                            className="w-4 h-4 shrink-0"
-                            color={a.tier ? TIER_COLOR[a.tier - 1] : 'var(--t1)'}
-                          />
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="shrink-0" style={{ color: a.tier ? TIER_COLOR[a.tier - 1] : 'var(--t1)' }}>
+                            <IconAmmo className="w-4 h-4" />
+                          </span>
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-medium num">{a.name}</span>
@@ -258,23 +244,23 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                                 <span className="badge !text-danger !border-danger/40">赛季限定</span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5">
+                            <div className="flex items-center gap-2 mt-1">
                               <span className="num text-[11px] text-muted">{a.caliber}</span>
                               <TierBadge a={a} />
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-center">
+                      <td className="px-3 py-3 text-center">
                         <PenBadge pen={a.pen_level} />
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-3">
                         <DmgBar ratio={a.dmg_ratio} color={a.dmg_ratio >= 1.1 ? 'var(--t5)' : a.dmg_ratio < 1 ? 'var(--muted)' : 'var(--text)'} />
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-3">
                         <DmgBar ratio={a.armor_ratio} color={a.armor_ratio >= 1.1 ? 'var(--t5)' : a.armor_ratio < 1 ? 'var(--muted)' : 'var(--info)'} />
                       </td>
-                      <td className="px-4 py-2.5 text-right num text-xs text-muted">
+                      <td className="px-4 py-3 text-right num text-xs text-muted">
                         {(a.weaponNames?.split('、').length ?? 0)} 把
                       </td>
                     </tr>
@@ -307,31 +293,29 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-5">
-              <div className="tac-panel p-3 text-center">
+              <div className="tac-panel rounded-lg p-3 text-center">
                 <p className="text-[11px] text-muted">穿透等级</p>
-                <div className="mt-1 flex justify-center">
+                <div className="mt-1.5 flex justify-center">
                   <PenBadge pen={selected.pen_level} />
                 </div>
               </div>
-              <div className="tac-panel p-3 text-center">
+              <div className="tac-panel rounded-lg p-3 text-center">
                 <p className="text-[11px] text-muted">品阶</p>
                 <p className="num text-lg font-bold mt-1" style={{ color: selected.tier ? TIER_COLOR[selected.tier - 1] : 'var(--t1)' }}>
                   {selected.tier ?? '?'} 阶
                 </p>
               </div>
-              <div className="tac-panel p-3 text-center">
+              <div className="tac-panel rounded-lg p-3 text-center">
                 <p className="text-[11px] text-muted">肉体伤害倍率</p>
                 <p className="num text-lg font-bold mt-1">{Math.round(selected.dmg_ratio * 100)}%</p>
               </div>
-              <div className="tac-panel p-3 text-center">
+              <div className="tac-panel rounded-lg p-3 text-center">
                 <p className="text-[11px] text-muted">护甲伤害倍率</p>
                 <p className="num text-lg font-bold mt-1">{Math.round(selected.armor_ratio * 100)}%</p>
               </div>
             </div>
 
-            {selected.season_limited === 1 && (
-              <p className="mt-3 text-xs text-danger">⚠ 赛季限定弹药</p>
-            )}
+            {selected.season_limited === 1 && <p className="mt-3 text-xs text-danger">⚠ 赛季限定弹药</p>}
 
             <h4 className="text-sm font-bold mt-5 mb-2 flex items-center gap-2">
               适用枪械 <span className="flex-1 h-px bg-edge" />

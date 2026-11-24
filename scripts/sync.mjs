@@ -53,18 +53,36 @@ async function main() {
   const tierAmmo = ammoRaw.ammo;
 
   // delta-force-core 作为武器补充源（本地 npm，无网络依赖）
+  // flatMap 时带上分类 category（WEAPONS 是 WeaponCategory 数组，武器对象本身无 category 字段）
   let dfcWeapons = [];
   try {
     const dfc = await import('delta-force-core');
-    dfcWeapons = dfc.WEAPONS.flatMap((g) => g.weapons ?? (Array.isArray(g) ? g : [g]));
+    dfcWeapons = dfc.WEAPONS.flatMap((g) => (g.weapons ?? []).map((w) => ({ ...w, category: g.category })));
     console.log(`  [OK] delta-force-core 武器 ${dfcWeapons.length} 条`);
   } catch (e) {
     console.warn(`  [WARN] delta-force-core 不可用，跳过补充源: ${e.message}`);
   }
 
+  // dfc 命名与官方不一致的别名映射（dfc 名 -> dfd 官方名），用于去重合并
+  const DFC_ALIAS = {
+    'QBZ-95-1突击步枪': 'QBZ95-1突击步枪',
+    'AS Val「巨浪」突击步枪': 'AS Val突击步枪',
+    'SR-3M冲锋枪': 'SR-3M紧凑突击步枪',
+    'MP7冲锋枪': 'MP7',
+    'M1014半自动霰弹枪': 'M1014霰弹枪',
+    'S12K连发霰弹枪': 'S12K霰弹枪',
+    'M14战斗射手步枪': 'M14射手步枪',
+    'AWM重型狙击步枪': 'AWM狙击步枪',
+    'QSZ92G手枪': 'QSZ92G',
+    '.357左轮手枪': '.357左轮',
+    '93R手枪': '93R',
+    'G17手枪': 'G17',
+    'G18手枪': 'G18',
+  };
+
   // ---- 2. 构建武器表 ----
-  // DFD 为主（面板全 + 官方图），dfc 按名称补缺
-  const dfcByName = new Map(dfcWeapons.map((w) => [w.name, w]));
+  // DFD 为主（面板全 + 官方图），dfc 按别名映射去重后补缺
+  const dfcByName = new Map(dfcWeapons.map((w) => [DFC_ALIAS[w.name] ?? w.name, w]));
   const weapons = [];
   const seenNames = new Set();
 
@@ -90,18 +108,24 @@ async function main() {
     });
     seenNames.add(g.objectName);
   }
+  // dfc 分类名与官方（dfd）不一致的归一映射
+  const DFC_CATEGORY_MAP = { 突击步枪: '步枪' };
+
   for (const w of dfcWeapons) {
-    if (seenNames.has(w.name)) continue;
+    const officialName = DFC_ALIAS[w.name] ?? w.name;
+    if (seenNames.has(officialName)) continue; // dfd 已有（含别名匹配），不重复入库
+    // dfc 字段映射（与 dfd 重叠武器数值交叉验证）：
+    // dfc.control == dfd.recoil（后坐力），dfc.handling == dfd.control（控制力）
     weapons.push({
       id: w.id,
       name: w.name,
-      category: w.category ?? '未知',
+      category: DFC_CATEGORY_MAP[w.category] ?? w.category ?? '未知',
       caliber: normalizeCaliber(w.caliber),
       image: w.image ?? '',
       imagePre: '',
       panel: {
         meatHarm: w.baseDamage, armorHarm: w.armorDamage, fireRate: w.fireRate,
-        effectiveRange: w.effectiveRange, recoil: null, control: w.handling,
+        effectiveRange: w.effectiveRange, recoil: w.control, control: w.handling,
         stability: w.aimStability, hipFire: w.hipFireAccuracy,
         muzzleVelocity: w.muzzleVelocity, magSize: w.magazineCapacity,
         fireModes: w.fireModes ?? [], soundRadius: w.soundRadius,
@@ -109,6 +133,8 @@ async function main() {
       slots: [],
       source: 'dfc',
     });
+    seenNames.add(w.name);
+    seenNames.add(officialName);
   }
 
   // ---- 3. 构建弹药表 + 弹药↔武器关联 ----
@@ -133,9 +159,18 @@ async function main() {
   const ammoWeapons = [];
   for (const w of weapons) {
     const g = dfdWeapons.find((x) => String(x.objectID) === w.id);
-    if (!g) continue; // dfc 补充源暂无 ammo 映射
-    for (const a of g.gunDetail?.ammo ?? []) {
-      ammoWeapons.push({ ammo_id: String(a.objectID), weapon_id: w.id });
+    if (g) {
+      // dfd 枪：官方 gunDetail.ammo 关联
+      for (const a of g.gunDetail?.ammo ?? []) {
+        ammoWeapons.push({ ammo_id: String(a.objectID), weapon_id: w.id });
+      }
+      continue;
+    }
+    // dfc 补充枪：无官方关联数据，按口径推导（口径决定可用弹药，与游戏规则一致）
+    for (const a of ammoRows) {
+      if (a.caliber && a.caliber === w.caliber) {
+        ammoWeapons.push({ ammo_id: a.id, weapon_id: w.id });
+      }
     }
   }
 
@@ -207,30 +242,33 @@ async function main() {
     if (!w.image || !/^https?:/.test(w.image)) continue;
     const local = `/img/weapons/${w.id}.png`;
     const file = path.join(ROOT, 'public', 'img', 'weapons', `${w.id}.png`);
-    if (fs.existsSync(file) && fs.statSync(file).size > 0) { imgSkip++; }
+    let ok = false;
+    if (fs.existsSync(file) && fs.statSync(file).size > 0) { imgSkip++; ok = true; }
     else {
       try {
         const res = await fetch(w.image, { signal: AbortSignal.timeout(30000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
         imgOk++;
+        ok = true;
       } catch (e) {
         imgFail++;
         console.warn(`  [WARN] 图片下载失败 ${w.name}: ${e.message}`);
       }
     }
-    w.image = local; // 无论本次是否下载成功，页面统一走本地路径
+    // 仅在本地文件可用时改写为本地路径；失败置空，页面走占位图（禁止出现 404 死链）
+    w.image = ok ? local : '';
   }
   const updImg = db.prepare('UPDATE weapons SET image = ? WHERE id = ?');
   db.transaction(() => {
-    for (const w of weapons) if (/^\/img\//.test(w.image)) updImg.run(w.image, w.id);
+    for (const w of weapons) updImg.run(w.image, w.id);
   })();
   console.log(`  图片: 新下载 ${imgOk} | 已存在 ${imgSkip} | 失败 ${imgFail}`);
 
   // ---- 5.7 弹药口径图标本地化（playerhub 官方贴图，按口径区分）----
   // 数据源 ammo.json 无图标字段，图标按口径从 playerhub 拉取，本地化避免热链
   const AMMO_ICON_MAP = {
-    '.300BLK': '300BLK', '.338 Lap Mag': '338', '.357 Magnum': '.357',
+    '.300BLK': '300BLK', '.338 Lap Mag': '338', '.357 Magnum': '357',
     '.45ACP': '45-ACP', '.50AE': '50-AE', '12.7x55': '12.7x55',
     '12Gauge': '12-Gauge', '4.6x30mm': '4.6x30mm', '5.45x39mm': '5.45x39mm',
     '5.56x45mm': '5.56x45mm', '5.7x28mm': '5.7x28mm', '5.8x42mm': '5.8x42mm',

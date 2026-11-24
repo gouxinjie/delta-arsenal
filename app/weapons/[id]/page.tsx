@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAllWeapons, getWeapon, getAmmoOfWeapon, getRelatedWeapons } from '@/lib/db';
+import { IconRifle } from '@/components/commons/icons';
 
 export function generateStaticParams() {
   return getAllWeapons().map((w) => ({ id: w.id }));
@@ -46,7 +47,13 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-6">
         <div className="tac-panel md:w-2/5 p-4 flex items-center justify-center">
-          <img src={w.image} alt={w.name} className="max-h-64 object-contain" />
+          {w.image ? (
+            <img src={w.image} alt={w.name} className="max-h-64 object-contain" />
+          ) : (
+            <span className="text-muted/30" aria-hidden="true">
+              <IconRifle className="w-24 h-24" />
+            </span>
+          )}
         </div>
         <div className="flex-1">
           <h1 className="text-xl font-bold">{w.name}</h1>

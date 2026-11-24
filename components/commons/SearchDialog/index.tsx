@@ -3,12 +3,13 @@
  * @description 全局搜索弹窗：模糊匹配武器/弹药/口径，键盘 Enter 直达、Esc 关闭；索引从 /search-index.json 加载
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-23
+ * @updated 2026-11-24
  */
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { IconSearch } from '@/components/commons/icons';
 
 /** 搜索索引条目（由 sync 脚本生成） */
 interface SearchItem {
@@ -70,26 +71,36 @@ export default function SearchDialog() {
 
   return (
     <>
+      {/* 搜索入口：图标 + 提示文案 + 快捷键键帽 */}
       <button
         onClick={() => setOpen(true)}
-        className="num text-xs text-muted border border-edge rounded px-3 py-1.5 hover:border-accent transition-colors"
+        className="flex items-center gap-2 text-xs text-muted border border-edge rounded-md px-3 py-1.5 bg-bg/60 hover:border-accent/60 hover:text-main transition-colors"
       >
-        搜索武器 / 弹药… <span className="hidden sm:inline ml-1">Ctrl+K</span>
+        <IconSearch className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">搜索武器 / 弹药…</span>
+        <kbd className="key-chip hidden sm:inline">Ctrl + K</kbd>
       </button>
+
       {open && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm anim-fade flex items-start justify-center pt-24 px-4" onClick={() => setOpen(false)}>
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm anim-fade flex items-start justify-center pt-24 px-4"
+          onClick={() => setOpen(false)}
+        >
           <div className="tac-panel w-full max-w-lg p-3 anim-slide" onClick={(e) => e.stopPropagation()}>
-            <input
-              ref={inputRef}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="输入枪名、弹名或口径，如：M4 / M995 / 5.56"
-              className="w-full bg-bg border border-edge rounded px-3 py-2 text-sm outline-none focus:border-accent"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && results[0]) go(results[0]);
-                if (e.key === 'Escape') setOpen(false);
-              }}
-            />
+            <div className="flex items-center gap-2 bg-bg border border-edge rounded px-3 focus-within:border-accent">
+              <IconSearch className="w-4 h-4 text-muted shrink-0" />
+              <input
+                ref={inputRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="输入枪名、弹名或口径，如：M4 / M995 / 5.56"
+                className="w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && results[0]) go(results[0]);
+                  if (e.key === 'Escape') setOpen(false);
+                }}
+              />
+            </div>
             <ul className="mt-2 max-h-80 overflow-y-auto">
               {results.map((r) => (
                 <li key={r.type + r.id}>

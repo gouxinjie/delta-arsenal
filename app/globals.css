@@ -1,22 +1,24 @@
 @import "tailwindcss";
 
+/* ---------- 主题令牌（暗黑军事科技风：青绿主色） ---------- */
 :root {
-  --bg: #12141a;
-  --panel: #1b1f29;
-  --panel-hi: #212736;
-  --border: #2a3040;
-  --border-hi: #3a4256;
-  --text: #e8eaed;
-  --muted: #8a93a6;
-  --accent: #ff9e2c;
-  --accent-dim: rgba(255, 158, 44, 0.12);
-  --info: #4da3ff;
-  --t1: #9aa3b2;
-  --t2: #3fbf62;
-  --t3: #3d8be8;
-  --t4: #a45fe0;
-  --t5: #f2b23e;
-  --danger: #e5484d;
+  --bg: #0a0f15;
+  --panel: #101922;
+  --panel-hi: #16222e;
+  --border: #223342;
+  --border-hi: #31485c;
+  --text: #e9f1f2;
+  --muted: #7f93a3;
+  --accent: #2fe3a4;
+  --accent-dim: rgba(47, 227, 164, 0.12);
+  --info: #3f9eff;
+  --t1: #cbd6df;
+  --t2: #4ade80;
+  --t3: #3d9bff;
+  --t4: #b06bff;
+  --t5: #ffc94d;
+  --danger: #ff5f5f;
+  --warn: #ffb84d;
 }
 
 @theme inline {
@@ -34,18 +36,33 @@
   --color-t4: var(--t4);
   --color-t5: var(--t5);
   --color-danger: var(--danger);
+  --color-warn: var(--warn);
   --font-mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
 }
 
+/* ---------- 全局底色 + 低对比度战术氛围层（固定，不随滚动） ---------- */
 body {
-  background:
-    radial-gradient(1200px 500px at 70% -10%, rgba(255, 158, 44, 0.05), transparent 60%),
-    radial-gradient(900px 400px at 10% 0%, rgba(77, 163, 255, 0.04), transparent 60%),
-    var(--bg);
+  background-color: var(--bg);
   color: var(--text);
-  font-family:
-    -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* 全宽 Hero 使用 50vw 突破容器，需裁掉潜在横向溢出 */
+  overflow-x: hidden;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 480px at 78% -12%, rgba(47, 227, 164, 0.06), transparent 60%),
+    radial-gradient(900px 420px at 6% 2%, rgba(63, 158, 255, 0.045), transparent 60%),
+    linear-gradient(rgba(47, 227, 164, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 227, 164, 0.03) 1px, transparent 1px);
+  background-size: auto, auto, 34px 34px, 34px 34px;
+  /* 网格只在上半屏隐约可见，避免干扰数据阅读 */
+  mask-image: linear-gradient(180deg, black 0%, rgba(0, 0, 0, 0.3) 45%, transparent 90%);
 }
 
 .num {
@@ -80,7 +97,7 @@ body {
   position: relative;
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
-/* 左上 + 右上 橙色切角线条 */
+/* 左上 + 右上 青绿切角线条 */
 .tac-panel::before {
   content: "";
   position: absolute;
@@ -105,18 +122,18 @@ body {
   border-color: var(--border-hi);
 }
 
-/* 可点击卡片：hover 抬升 + 橙光 */
+/* 可点击卡片：hover 抬升 + 青绿光 */
 .tac-hover:hover {
-  border-color: rgba(255, 158, 44, 0.6) !important;
+  border-color: rgba(47, 227, 164, 0.6) !important;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 158, 44, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(47, 227, 164, 0.15);
 }
 
-/* ---------- 首页 Hero 网格底纹 ---------- */
+/* ---------- Hero 网格底纹（页头横幅内使用） ---------- */
 .bg-grid {
   background-image:
-    linear-gradient(rgba(255, 158, 44, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 158, 44, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(47, 227, 164, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 227, 164, 0.06) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: radial-gradient(ellipse 80% 100% at 50% 0%, black 30%, transparent 75%);
 }
@@ -132,6 +149,18 @@ body {
   border-radius: 3px;
   border: 1px solid var(--border);
   background: var(--bg);
+}
+
+/* 快捷键小键帽 */
+.key-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--muted);
 }
 
 select {
@@ -150,7 +179,7 @@ select:hover {
 }
 select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(255, 158, 44, 0.35);
+  box-shadow: 0 0 0 1px rgba(47, 227, 164, 0.35);
   outline: none;
 }
 option {
@@ -162,6 +191,19 @@ option {
 table.matrix-table td,
 table.matrix-table th {
   border-color: var(--border);
+}
+
+/* ---------- 导航选中态青绿辉光 ---------- */
+.nav-glow {
+  text-shadow: 0 0 14px rgba(47, 227, 164, 0.55);
+}
+.nav-line {
+  box-shadow: 0 0 10px rgba(47, 227, 164, 0.8);
+}
+
+/* ---------- 标题青绿辉光（首页 Hero） ---------- */
+.title-glow {
+  text-shadow: 0 0 24px rgba(47, 227, 164, 0.4), 0 0 60px rgba(47, 227, 164, 0.15);
 }
 
 /* ---------- 滚动条 ---------- */

@@ -1,9 +1,9 @@
 /**
  * @component Header
- * @description 全站顶部导航栏：LOGO、主导航（含当前页高亮下划线）、移动端二级导航、全局搜索入口
+ * @description 全站顶部导航栏：三角形 LOGO、主导航（青绿辉光选中态）、移动端二级导航、全局搜索入口
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-23
+ * @updated 2026-11-24
  */
 'use client';
 
@@ -36,43 +36,61 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-edge bg-bg/90 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-7">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <span className="flex flex-col gap-[3px] group-hover:gap-[5px] transition-all">
-            <span className="w-4 h-[2px] bg-accent" />
-            <span className="w-3 h-[2px] bg-accent/60" />
-            <span className="w-2 h-[2px] bg-accent/30" />
-          </span>
-          <span className="font-bold tracking-[0.18em] text-[15px]">
+    <header className="sticky top-0 z-40 border-b border-edge bg-bg/85 backdrop-blur-md">
+      <div className="max-w-[1200px] mx-auto px-4 h-14 flex items-center gap-6">
+        {/* LOGO：青绿渐变三角（三角洲军徽意象）+ 站名 */}
+        <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+          <svg
+            viewBox="0 0 32 32"
+            className="w-7 h-7 drop-shadow-[0_0_12px_rgba(47,227,164,0.55)] transition-transform group-hover:scale-105"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id="logo-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8affd4" />
+                <stop offset="100%" stopColor="#14b87e" />
+              </linearGradient>
+            </defs>
+            <path d="M16 3 L30 28 H2 Z" fill="url(#logo-grad)" />
+            <path d="M16 12 L23.5 25 H8.5 Z" fill="var(--bg)" />
+          </svg>
+          <span className="font-bold tracking-[0.16em] text-[15px]">
             三角洲<span className="text-accent">军械库</span>
           </span>
         </Link>
+
         <nav className="hidden md:flex items-center gap-1 text-sm">
           {NAV.map((n) => (
             <Link
               key={n.href}
               href={n.href}
-              className={`px-3 py-1.5 rounded transition-colors relative ${
-                isActive(n.href) ? 'text-accent' : 'text-muted hover:text-main'
+              className={`relative px-3 py-1.5 rounded transition-colors ${
+                isActive(n.href) ? 'text-accent nav-glow' : 'text-muted hover:text-main'
               }`}
             >
-              {n.label}
-              {isActive(n.href) && <span className="absolute bottom-0 left-3 right-3 h-[2px] bg-accent rounded" />}
+              {/* 选中态底衬 + 底部青绿辉光线（贯穿项宽） */}
+              {isActive(n.href) && <span className="absolute inset-0 bg-accent/10 rounded" aria-hidden="true" />}
+              <span className="relative">{n.label}</span>
+              {isActive(n.href) && (
+                <span className="absolute bottom-0 inset-x-1 h-[2px] bg-accent rounded nav-line" aria-hidden="true" />
+              )}
             </Link>
           ))}
         </nav>
+
         <div className="ml-auto">
           <SearchDialog />
         </div>
       </div>
+
+      {/* 移动端二级导航 */}
       <nav className="md:hidden flex gap-1.5 px-4 pb-2 text-sm overflow-x-auto">
         {NAV.map((n) => (
           <Link
             key={n.href}
             href={n.href}
             className={`px-3 py-1 rounded border whitespace-nowrap transition-colors ${
-              isActive(n.href) ? 'border-accent text-accent' : 'border-edge text-muted'
+              isActive(n.href) ? 'border-accent text-accent nav-glow' : 'border-edge text-muted'
             }`}
           >
             {n.label}
