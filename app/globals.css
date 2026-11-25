@@ -214,14 +214,8 @@ body::before {
   from { opacity: 0; transform: translateX(24px); }
   to { opacity: 1; transform: translateX(0); }
 }
-/* 右侧抽屉入场：面板从屏幕右缘外整体滑入，位移按自身宽度计算不会被裁切 */
-@keyframes drawerInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
 .anim-fade { animation: fadeIn 0.2s ease-out; }
 .anim-slide { animation: slideInRight 0.28s cubic-bezier(0.22, 0.61, 0.36, 1); }
-.anim-drawer-right { animation: drawerInRight 0.3s cubic-bezier(0.22, 0.61, 0.36, 1); }
 
 /* ---------- 战术面板 ---------- */
 .tac-panel {
@@ -269,6 +263,11 @@ body::before {
   box-shadow: var(--hover-shadow);
 }
 
+/* 极简 hover：仅高亮边框，不做位移 / 投影 / 内容变化 */
+.tac-panel.tac-hover-border:hover {
+  border-color: var(--accent);
+}
+
 /* ---------- Hero 网格底纹（页头横幅内使用） ---------- */
 .bg-grid {
   background-image:
@@ -279,13 +278,9 @@ body::before {
 }
 
 /* ---------- 主题化装饰工具类 ---------- */
-/* 武器图投影：暗色主题走青绿微光，浅色主题走中性灰投影 */
+/* 武器图投影：暗色主题走青绿微光，浅色主题走中性灰投影（静态，不随 hover 变化） */
 .weapon-img {
   filter: drop-shadow(0 3px 8px var(--img-shadow));
-  transition: transform 0.3s ease, filter 0.3s ease, opacity 0.3s ease;
-}
-.group:hover .weapon-img {
-  filter: drop-shadow(0 5px 14px var(--img-shadow-hi));
 }
 /* 武器卡片图片区径向底纹 */
 .thumb-bg {

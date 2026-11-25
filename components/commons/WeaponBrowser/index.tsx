@@ -1,6 +1,6 @@
 /**
  * @component WeaponBrowser
- * @description 武器图鉴浏览器：按类型 Tab（带图标 + 计数）筛选，卡片网格展示，点击卡片从左侧弹出详情抽屉（不跳页）
+ * @description 武器图鉴浏览器：按类型 Tab（带图标 + 计数）筛选，卡片网格展示，点击卡片从右侧弹出详情抽屉（不跳页）
  * @author gouxinjie
  * @created 2026-11-23
  * @updated 2026-11-25
@@ -23,8 +23,16 @@ import {
 import WeaponDrawer from '@/components/commons/WeaponDrawer';
 import type { WeaponDetail, WeaponPanel } from '@/types/weapon';
 
-/** 卡片武器图：无图或加载失败时显示枪械剪影占位（配合数据源图片缺失场景） */
-function WeaponImage({ src, alt }: { src: string; alt: string }) {
+/** 图片偏小的分类：短枪身高宽比接近方形，在宽幅图区里会被撑满高度显得过大，单独缩放 */
+const COMPACT_IMG_CATEGORIES = new Set(['手枪']);
+
+/**
+ * 卡片武器图：无图或加载失败时显示枪械剪影占位（配合数据源图片缺失场景）
+ * @param props.src - 图片地址，空值直接走占位剪影
+ * @param props.alt - 图片替代文本（武器名）
+ * @param props.compact - 是否缩小展示（短枪身武器用，默认 false）
+ */
+function WeaponImage({ src, alt, compact = false }: { src: string; alt: string; compact?: boolean }) {
   const [err, setErr] = useState(!src);
   if (err) {
     return (
@@ -38,7 +46,7 @@ function WeaponImage({ src, alt }: { src: string; alt: string }) {
       src={src}
       alt={alt}
       loading="lazy"
-      className="weapon-img max-h-full max-w-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-105"
+      className={`weapon-img max-w-full object-contain opacity-90 ${compact ? 'max-h-[68%]' : 'max-h-full'}`}
       onError={() => setErr(true)}
     />
   );
@@ -123,10 +131,10 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
             <button
               key={t.label}
               onClick={() => setTab(t.label)}
-              className={`flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border transition-colors ${
+              className={`flex items-center gap-1.5 whitespace-nowrap text-xs px-3.5 py-1.5 rounded-full border transition-colors ${
                 active
                   ? 'bg-accent text-[color:var(--on-accent)] border-accent font-semibold [box-shadow:var(--tab-glow)]'
-                  : 'border-edge bg-panel/60 text-muted hover:text-main hover:border-border-hi'
+                  : 'border-edge bg-panel/60 text-muted hover:bg-accent hover:text-[color:var(--on-accent)] hover:border-accent hover:font-semibold hover:[box-shadow:var(--tab-glow)]'
               }`}
             >
               {t.icon('w-3.5 h-3.5')}
@@ -139,7 +147,7 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
       </div>
 
       {/* 武器卡片网格 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-4">
         {list.map((w) => {
           const hot = HOT_WEAPONS.has(w.name);
           return (
@@ -149,17 +157,18 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
               onClick={(e) => openDrawer(e, w)}
               aria-haspopup="dialog"
               aria-label={`查看 ${w.name} 详情`}
-              className="tac-panel tac-hover rounded-lg overflow-hidden group flex flex-col"
+              className="tac-panel tac-panel-plain tac-hover-border rounded-lg overflow-hidden flex flex-col"
             >
               {/* 标题区：武器名 + 类别·口径，热门角标靠右 */}
               <div className="flex items-start justify-between gap-2 px-3 pt-2.5 pb-2">
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold truncate group-hover:text-accent transition-colors">
-                    {w.name}
-                  </h3>
+                  <h3 className="text-sm font-semibold truncate">{w.name}</h3>
                   <p className="text-[11px] text-muted mt-0.5 truncate">
                     {w.category}
-                    <span className="num"> · {w.caliber || '—'}</span>
+                    {/* 使用的弹药口径：强调色胶囊，与类别文字区分开 */}
+                    <span className="num ml-1 px-1 py-px rounded text-accent font-medium bg-accent/10">
+                      {w.caliber || '—'}
+                    </span>
                   </p>
                 </div>
                 {hot && (
@@ -168,8 +177,8 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
               </div>
 
               {/* 图片区：扁平宽幅 + 暗底径向渐变，枪械图不压过文字信息 */}
-              <div className="thumb-bg relative aspect-[3/1] flex items-center justify-center overflow-hidden bg-bg px-5">
-                <WeaponImage src={w.image} alt={w.name} />
+              <div className="thumb-bg relative aspect-[7/2] flex items-center justify-center overflow-hidden bg-bg px-5">
+                <WeaponImage src={w.image} alt={w.name} compact={COMPACT_IMG_CATEGORIES.has(w.category)} />
               </div>
 
               {/* 参数栏：8 项等宽平铺，标签在上数值在下（对齐参考图） */}
@@ -182,10 +191,10 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
                 ))}
               </div>
 
-              {/* 底部操作条：hover 变色，替代原参考图的「复制改枪码」 */}
-              <div className="mt-auto flex items-center justify-center gap-1 border-t border-edge/60 py-1.5 text-[11px] text-muted group-hover:text-accent group-hover:bg-panel-hi/40 transition-colors">
+              {/* 底部操作条：常态强调色 + 淡强调底，hover 不再变化 */}
+              <div className="mt-auto flex items-center justify-center gap-1 border-t border-edge/60 py-2 text-[13px] font-medium text-accent bg-accent/10">
                 查看详情
-                <span className="text-[13px] leading-none">›</span>
+                <span className="text-[14px] leading-none">›</span>
               </div>
             </Link>
           );
