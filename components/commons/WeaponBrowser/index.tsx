@@ -19,9 +19,6 @@ import {
   IconShotgun,
   IconPistol,
   IconUnknown,
-  IconTarget,
-  IconBolt,
-  IconRecoil,
 } from '@/components/commons/icons';
 
 /** 卡片武器图：无图或加载失败时显示枪械剪影占位（配合数据源图片缺失场景） */
@@ -30,7 +27,7 @@ function WeaponImage({ src, alt }: { src: string; alt: string }) {
   if (err) {
     return (
       <span className="flex items-center justify-center text-muted/30">
-        <IconRifle className="w-20 h-20" />
+        <IconRifle className="w-12 h-12" />
       </span>
     );
   }
@@ -39,7 +36,7 @@ function WeaponImage({ src, alt }: { src: string; alt: string }) {
       src={src}
       alt={alt}
       loading="lazy"
-      className="max-h-full object-contain transition-all duration-300 group-hover:scale-110 drop-shadow-[0_6px_16px_rgba(47,227,164,0.16)] group-hover:drop-shadow-[0_8px_26px_rgba(47,227,164,0.4)]"
+      className="max-h-full max-w-full object-contain opacity-90 transition-all duration-300 group-hover:opacity-100 group-hover:scale-105 drop-shadow-[0_3px_8px_rgba(47,227,164,0.1)] group-hover:drop-shadow-[0_5px_14px_rgba(47,227,164,0.2)]"
       onError={() => setErr(true)}
     />
   );
@@ -57,9 +54,38 @@ interface WeaponCard {
   caliber: string;
   /** 本地图片路径 */
   image: string;
-  /** 面板摘要（伤害/射速/后坐） */
-  panel: { meatHarm?: number; fireRate?: number; recoil?: number };
+  /** 面板参数（与武器详情页 panel 字段同源，缺值按 '—' 展示） */
+  panel: {
+    /** 肉体伤害 */
+    meatHarm?: number;
+    /** 护甲伤害 */
+    armorHarm?: number;
+    /** 射速（发/分） */
+    fireRate?: number;
+    /** 有效射程 */
+    effectiveRange?: number;
+    /** 后坐力 */
+    recoil?: number;
+    /** 操控 */
+    control?: number;
+    /** 稳定性 */
+    stability?: number;
+    /** 腰射精度 */
+    hipFire?: number;
+  };
 }
+
+/** 卡片参数栏配置：8 项等宽平铺（对齐参考图排版） */
+const CARD_STATS: { key: keyof WeaponCard['panel']; label: string }[] = [
+  { key: 'meatHarm', label: '肉伤' },
+  { key: 'armorHarm', label: '甲伤' },
+  { key: 'fireRate', label: '射速' },
+  { key: 'effectiveRange', label: '射程' },
+  { key: 'recoil', label: '后座' },
+  { key: 'control', label: '操控' },
+  { key: 'stability', label: '稳定' },
+  { key: 'hipFire', label: '腰射' },
+];
 
 /** 分类 Tab 配置：标签 + 图标（图标按当前色继承） */
 const TABS: { label: string; icon: (cls: string) => React.ReactNode }[] = [
@@ -118,36 +144,50 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
       </div>
 
       {/* 武器卡片网格 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {list.map((w) => {
           const hot = HOT_WEAPONS.has(w.name);
           return (
-            <Link key={w.id} href={`/weapons/${w.id}`} className="tac-panel tac-hover rounded-lg overflow-hidden group">
-              {/* 图片区：暗底径向渐变 + 武器图青绿光晕，hover 增强；无图走占位剪影 */}
-              <div className="relative aspect-[4/3] flex items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(47,227,164,0.06),transparent_70%)] bg-bg">
-                <WeaponImage src={w.image} alt={w.name} />
+            <Link
+              key={w.id}
+              href={`/weapons/${w.id}`}
+              className="tac-panel tac-hover rounded-lg overflow-hidden group flex flex-col"
+            >
+              {/* 标题区：武器名 + 类别·口径，热门角标靠右 */}
+              <div className="flex items-start justify-between gap-2 px-3 pt-2.5 pb-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold truncate group-hover:text-accent transition-colors">
+                    {w.name}
+                  </h3>
+                  <p className="text-[11px] text-muted mt-0.5 truncate">
+                    {w.category}
+                    <span className="num"> · {w.caliber || '—'}</span>
+                  </p>
+                </div>
                 {hot && (
-                  <span className="absolute top-2 right-2 badge bg-danger/15 text-danger border-danger/40">🔥 热门</span>
+                  <span className="shrink-0 badge bg-danger/15 text-danger border-danger/40">🔥 热门</span>
                 )}
               </div>
-              <div className="p-3">
-                <h3 className="text-sm font-semibold group-hover:text-accent transition-colors truncate">{w.name}</h3>
-                <p className="num text-[11px] text-muted mt-0.5">{w.caliber || '—'}</p>
-                {/* 面板摘要：伤害(橙) / 射速(蓝) / 后坐(绿)，数字与图标同色（对齐设计稿） */}
-                <p className="num text-[11px] mt-2 flex items-center gap-3">
-                  <span className="flex items-center gap-1 text-warn">
-                    <IconTarget className="w-3.5 h-3.5" />
-                    <b className="font-semibold">{w.panel.meatHarm ?? '—'}</b>
-                  </span>
-                  <span className="flex items-center gap-1 text-info">
-                    <IconBolt className="w-3.5 h-3.5" />
-                    <b className="font-semibold">{w.panel.fireRate ?? '—'}</b>
-                  </span>
-                  <span className="flex items-center gap-1 text-accent">
-                    <IconRecoil className="w-3.5 h-3.5" />
-                    <b className="font-semibold">{w.panel.recoil ?? '—'}</b>
-                  </span>
-                </p>
+
+              {/* 图片区：扁平宽幅 + 暗底径向渐变，枪械图不压过文字信息 */}
+              <div className="relative aspect-[3/1] flex items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(47,227,164,0.05),transparent_70%)] bg-bg px-5">
+                <WeaponImage src={w.image} alt={w.name} />
+              </div>
+
+              {/* 参数栏：8 项等宽平铺，标签在上数值在下（对齐参考图） */}
+              <div className="num grid grid-cols-8 gap-x-1 px-2.5 py-2 border-t border-edge/60">
+                {CARD_STATS.map((s) => (
+                  <div key={s.key} className="flex flex-col items-center gap-0.5 min-w-0">
+                    <span className="text-[10px] text-muted whitespace-nowrap">{s.label}</span>
+                    <b className="text-[13px] font-semibold text-main">{w.panel[s.key] ?? '—'}</b>
+                  </div>
+                ))}
+              </div>
+
+              {/* 底部操作条：hover 变色，替代原参考图的「复制改枪码」 */}
+              <div className="mt-auto flex items-center justify-center gap-1 border-t border-edge/60 py-1.5 text-[11px] text-muted group-hover:text-accent group-hover:bg-panel-hi/40 transition-colors">
+                查看详情
+                <span className="text-[13px] leading-none">›</span>
               </div>
             </Link>
           );

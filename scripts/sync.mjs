@@ -13,6 +13,7 @@ const DB_PATH = path.join(DATA_DIR, 'delta.db');
 const SOURCES = {
   guns: 'https://cdn.jsdelivr.net/gh/jiansenc/DeltaForceData@main/public/json/gun/gunRifle.json',
   ammo: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/ammo.json',
+  tierWeapons: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/weapons.json',
 };
 
 const TIER_BY_RARITY = { 白: 1, 绿: 2, 蓝: 3, 紫: 4, 橙: 5, 金: 5 };
@@ -40,6 +41,26 @@ function normalizeCaliber(c) {
   return c.replace(/^ammo/, '').trim();
 }
 
+/**
+ * 武器名称归一化：跨源名称匹配用（dfc 名 / tierlist 名与官方名常有差异）
+ * 规则：小写 → 去括号注释 → 去空格/连字符 → 去类别后缀词
+ * @param {string} name - 原始武器名
+ * @returns {string} 归一化后的名称 key
+ */
+function normalizeName(name) {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .replace(/（[^）]*）|\([^)]*\)/g, '')
+    .replace(/[\s\-—·]/g, '')
+    .replace(/(紧凑)?突击步枪|战斗步枪|冲锋枪|射手步枪|重型?狙击步枪|杠杆(式)?步枪|霰弹枪|轻机枪|通用机枪|手枪|战术|弓/g, '');
+}
+
+// 归一化后仍不一致的跨源别名（tierlist weapons.json 名 -> 官方名）
+const NAME_ALIAS = {
+  马林: 'marlin', // 马林杠杆式步枪 vs Marlin杠杆步枪
+};
+
 async function main() {
   console.log('== 三角洲军械库 sync 开始 ==');
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -48,6 +69,22 @@ async function main() {
   // ---- 1. 拉取数据源 ----
   const gunsRaw = await fetchJSON('guns', SOURCES.guns);
   const ammoRaw = await fetchJSON('ammo', SOURCES.ammo);
+  // tierlist weapons.json：含 88 把武器的官方 weapon_id，用于给补充源武器匹配官方图
+  let tierWeapons = [];
+  try {
+    const tierRaw = await fetchJSON('tier_weapons', SOURCES.tierWeapons);
+    tierWeapons = tierRaw.weapons ?? [];
+    console.log(`  [OK] tierlist weapons ${tierWeapons.length} 条`);
+  } catch (e) {
+    console.warn(`  [WARN] tierlist weapons 拉取失败，官方图匹配降级: ${e.message}`);
+  }
+  // 归一化名称 -> 官方 weapon_id（同 id 重复出现直接覆盖，结果一致）
+  const TIER_ID_BY_NAME = new Map(
+    tierWeapons.map((w) => {
+      const key = normalizeName(w.name);
+      return [NAME_ALIAS[key] ?? key, String(w.weapon_id)];
+    })
+  );
 
   const dfdWeapons = gunsRaw.jData.data.data.list;
   const tierAmmo = ammoRaw.ammo;
@@ -101,6 +138,8 @@ async function main() {
       category: g.secondClassCN,
       caliber: normalizeCaliber(gd.caliber),
       image: g.pic ?? '',
+      // 候选图 URL 列表（下载时按顺序尝试，成功即止）
+      imageUrls: [g.pic ?? ''].filter(Boolean),
       imagePre: g.prePic ?? '',
       panel,
       slots: (gd.accessory ?? []).map((s) => s.slotID).filter(Boolean),
@@ -116,12 +155,23 @@ async function main() {
     if (seenNames.has(officialName)) continue; // dfd 已有（含别名匹配），不重复入库
     // dfc 字段映射（与 dfd 重叠武器数值交叉验证）：
     // dfc.control == dfd.recoil（后坐力），dfc.handling == dfd.control（控制力）
+    // 图片候选（按优先级）：官方 playerhub 图（tierlist weapon_id 匹配）→ dfc 图床 → jsDelivr 镜像
+    const dfcImg = w.image ?? '';
+    const dfcImgMirror = dfcImg.replace(
+      /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.*)$/,
+      'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4'
+    );
+    const normKey = NAME_ALIAS[normalizeName(w.name)] ?? normalizeName(w.name);
+    const tierId = TIER_ID_BY_NAME.get(normKey);
+    const tierImg = tierId ? `https://playerhub.df.qq.com/playerhub/60004/object/${tierId}.png` : '';
+    if (!tierId) console.warn(`  [WARN] ${w.name} 未匹配到官方 weapon_id，图链降级为 dfc 源`);
     weapons.push({
       id: w.id,
       name: w.name,
       category: DFC_CATEGORY_MAP[w.category] ?? w.category ?? '未知',
       caliber: normalizeCaliber(w.caliber),
-      image: w.image ?? '',
+      image: tierImg || dfcImg,
+      imageUrls: [...new Set([tierImg, dfcImg, dfcImgMirror])].filter(Boolean),
       imagePre: '',
       panel: {
         meatHarm: w.baseDamage, armorHarm: w.armorDamage, fireRate: w.fireRate,
@@ -239,22 +289,29 @@ async function main() {
   fs.mkdirSync(IMG_DIR, { recursive: true });
   let imgOk = 0, imgSkip = 0, imgFail = 0;
   for (const w of weapons) {
-    if (!w.image || !/^https?:/.test(w.image)) continue;
+    // 候选 URL 按顺序尝试（如 dfc：raw.githubusercontent 失败自动走 jsDelivr 镜像）
+    const urls = (w.imageUrls ?? []).filter((u) => /^https?:/.test(u));
+    if (!urls.length) continue;
     const local = `/img/weapons/${w.id}.png`;
     const file = path.join(ROOT, 'public', 'img', 'weapons', `${w.id}.png`);
     let ok = false;
     if (fs.existsSync(file) && fs.statSync(file).size > 0) { imgSkip++; ok = true; }
     else {
-      try {
-        const res = await fetch(w.image, { signal: AbortSignal.timeout(30000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
-        imgOk++;
-        ok = true;
-      } catch (e) {
-        imgFail++;
-        console.warn(`  [WARN] 图片下载失败 ${w.name}: ${e.message}`);
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const buf = Buffer.from(await res.arrayBuffer());
+          if (!buf.length) throw new Error('空文件');
+          fs.writeFileSync(file, buf);
+          imgOk++;
+          ok = true;
+          break;
+        } catch (e) {
+          console.warn(`  [WARN] 图片下载失败 ${w.name} <- ${url}: ${e.message}`);
+        }
       }
+      if (!ok) imgFail++;
     }
     // 仅在本地文件可用时改写为本地路径；失败置空，页面走占位图（禁止出现 404 死链）
     w.image = ok ? local : '';
