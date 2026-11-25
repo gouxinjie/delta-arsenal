@@ -3,7 +3,7 @@
  * @description 全站页脚：数据版本与更新时间、收录统计、关于入口、非官方免责声明
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-23
+ * @updated 2026-11-25
  */
 import Link from 'next/link';
 
@@ -17,12 +17,14 @@ interface FooterProps {
 
 export default function Footer({ meta, counts }: FooterProps) {
   const updated = meta.generatedAt ? new Date(meta.generatedAt).toLocaleDateString('zh-CN') : '—';
+  // 数据集版本（如 20261105-weiguang.1）用于判断本站是否落后于上游，未知时不展示
+  const datasetVersion = meta.datasetVersion && meta.datasetVersion !== 'unknown' ? meta.datasetVersion : '';
   return (
     <footer className="border-t border-edge mt-10">
       <div className="max-w-[1200px] mx-auto px-4 py-6 text-xs text-muted space-y-2">
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           <span className="num">
-            数据版本 {meta.season ?? '—'} · 更新于 {updated}
+            数据版本 {meta.season ?? '—'} · {datasetVersion || '—'} · 更新于 {updated}
           </span>
           <span className="num">
             收录弹药 {counts.ammo} · 武器 {counts.weapons}

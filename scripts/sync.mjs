@@ -4,6 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 
 // 版本守卫：better-sqlite3 原生模块按 Node 22 ABI 编译，
@@ -22,9 +23,45 @@ const SOURCES = {
   guns: 'https://cdn.jsdelivr.net/gh/jiansenc/DeltaForceData@main/public/json/gun/gunRifle.json',
   ammo: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/ammo.json',
   tierWeapons: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/weapons.json',
+  // 元数据源：数据集版本与上游同步时间，仅用于版本标注与变化检测，拉取失败不阻塞主流程
+  provenance: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/provenance.json',
 };
 
 const TIER_BY_RARITY = { 白: 1, 绿: 2, 蓝: 3, 紫: 4, 橙: 5, 金: 5 };
+
+/**
+ * 数据集版本 -> 赛季标签映射。
+ * provenance.json 的 dataset_version 形如 `20261105-weiguang.1`（日期-赛季代号.修订号），
+ * 上游开新赛季会递增该值，必须在此补一行；未登记时会告警并把赛季标记为「未知」，
+ * 避免站点继续挂着旧赛季标签而无人发现。
+ */
+const SEASON_BY_DATASET = {
+  '20261105-weiguang.1': 'S12',
+};
+
+/**
+ * 计算弹药关键字段指纹（id + 穿透等级 + 穿透矩阵），用于跨次同步比对数据是否变动
+ * @param {Array<{ id: string, pen_level: number, matrix: object }>} rows - 弹药行
+ * @returns {string} 16 位 sha256 指纹
+ */
+function ammoFingerprint(rows) {
+  const payload = rows
+    .map((a) => [a.id, a.pen_level, a.matrix])
+    .sort((x, y) => String(x[0]).localeCompare(String(y[0])));
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 16);
+}
+
+/**
+ * 从 provenance 解析数据集版本信息
+ * @param {object|null} prov - provenance.json 内容（拉取失败为 null）
+ * @returns {{ datasetVersion: string, datasetSyncedAt: string, season: string }}
+ */
+function resolveDataset(prov) {
+  const datasetVersion = prov?.source?.dataset_version ?? 'unknown';
+  const datasetSyncedAt = prov?.source?.synced_at ?? '';
+  const season = SEASON_BY_DATASET[datasetVersion] ?? '未知';
+  return { datasetVersion, datasetSyncedAt, season };
+}
 
 async function fetchJSON(key, url) {
   const cache = path.join(ROOT, 'tmp', `${key}_cache.json`);
@@ -132,6 +169,13 @@ async function main() {
     console.log(`  [OK] tierlist weapons ${tierWeapons.length} 条`);
   } catch (e) {
     console.warn(`  [WARN] tierlist weapons 拉取失败，官方图匹配降级: ${e.message}`);
+  }
+  // provenance：数据集版本号与上游同步时间（仅用于版本标注与变化检测，失败不阻塞主流程）
+  let provenance = null;
+  try {
+    provenance = await fetchJSON('provenance', SOURCES.provenance);
+  } catch (e) {
+    console.warn(`  [WARN] provenance 拉取失败，数据版本降级为未知: ${e.message}`);
   }
   // 归一化名称 -> 官方 tier 记录（weapon_id 与口径均以官方为准）
   // 同一武器在 tier 表可能有多条记录（同 id 多品阶），已核实：归一名称命中多条时 id 与口径均唯一，直接覆盖结果一致
@@ -385,6 +429,50 @@ async function main() {
   }
   if (failed) throw new Error('数据量低于阈值，终止写入');
 
+  // ---- 4.5 版本溯源与变化检测（须在删库前读取旧 meta）----
+  const { datasetVersion, datasetSyncedAt, season } = resolveDataset(provenance);
+  if (!SEASON_BY_DATASET[datasetVersion]) {
+    console.warn(`  [WARN] 未登记的数据集版本 ${datasetVersion}，请在 SEASON_BY_DATASET 补映射，否则赛季标签为「未知」`);
+  }
+  const ammoFp = ammoFingerprint(ammoRows);
+  const nextCounts = { ammo: ammoRows.length, weapons: weapons.length, links: ammoWeapons.length };
+
+  /** 旧库版本快照（读取失败不影响写入，仅跳过变化检测） */
+  const prevMeta = {};
+  let prevDb;
+  try {
+    if (fs.existsSync(DB_PATH)) {
+      prevDb = new Database(DB_PATH, { readonly: true });
+      for (const r of prevDb.prepare('SELECT key, value FROM meta').all()) prevMeta[r.key] = r.value;
+    }
+  } catch (e) {
+    console.warn(`  [WARN] 旧库版本读取失败，跳过变化检测: ${e.message}`);
+  } finally {
+    // 异常路径也必须释放连接：Windows 下残留句柄会导致随后的删库失败
+    try {
+      prevDb?.close();
+    } catch {
+      // 关闭失败不影响后续就地重建
+    }
+  }
+  if (prevMeta.datasetVersion && prevMeta.datasetVersion !== datasetVersion) {
+    console.warn(`  [WARN] 数据集版本变化: ${prevMeta.datasetVersion} -> ${datasetVersion}，请复核赛季文案`);
+  }
+  if (prevMeta.ammoFingerprint && prevMeta.ammoFingerprint !== ammoFp) {
+    console.warn(`  [WARN] 弹药数据指纹变化: ${prevMeta.ammoFingerprint} -> ${ammoFp}，弹种或穿透矩阵有改动，建议复核`);
+  }
+  try {
+    const prevCounts = prevMeta.counts ? JSON.parse(prevMeta.counts) : null;
+    if (prevCounts) {
+      const changed = ['ammo', 'weapons', 'links'].filter((k) => prevCounts[k] !== nextCounts[k]);
+      if (changed.length) {
+        console.warn(`  [WARN] 收录数量变化: ${changed.map((k) => `${k} ${prevCounts[k]} -> ${nextCounts[k]}`).join(' | ')}`);
+      }
+    }
+  } catch {
+    console.warn('  [WARN] 旧库 counts 解析失败，跳过数量比对');
+  }
+
   // ---- 5. 写入 SQLite（全量重建）----
   // 优先删库重建；库文件被占用（如开发服务器持有只读连接）时退化为就地重建，
   // 避免因文件锁导致整次同步失败。
@@ -432,10 +520,15 @@ async function main() {
     for (const r of ammoWeapons) insAW.run(r);
     const meta = {
       generatedAt: now,
-      // 与数据源 provenance.json 的 dataset_version（20261105-weiguang.1 = S12「微光」）保持一致
-      season: 'S12',
+      // 赛季标签由数据集版本映射得出，避免手写常量与上游脱节
+      season,
+      // 上游 provenance 的 dataset_version / synced_at，用于核对本站数据是否落后
+      datasetVersion,
+      datasetSyncedAt,
+      // 弹药关键字段指纹（id + 穿透等级 + 穿透矩阵），跨次同步变化检测用
+      ammoFingerprint: ammoFp,
       sources: JSON.stringify(Object.values(SOURCES).concat('delta-force-core@0.8.0')),
-      counts: JSON.stringify({ ammo: ammoRows.length, weapons: weapons.length, links: ammoWeapons.length }),
+      counts: JSON.stringify(nextCounts),
     };
     for (const [k, v] of Object.entries(meta)) {
       db.prepare('INSERT INTO meta VALUES (?,?)').run(k, v);
@@ -522,6 +615,7 @@ async function main() {
   const caliberDist = {};
   for (const a of ammoRows) caliberDist[a.caliber] = (caliberDist[a.caliber] ?? 0) + 1;
   console.log('== sync 完成 ==');
+  console.log(`  数据版本: ${season} · ${datasetVersion}（上游同步于 ${datasetSyncedAt || '未知'}）`);
   console.log(`  弹药: ${ammoRows.length} 条 | 武器: ${weapons.length} 条 | 关联: ${ammoWeapons.length} 条`);
   console.log(`  口径分布:`, caliberDist);
   console.log(`  输出: ${DB_PATH}`);

@@ -12,7 +12,7 @@
 
 - Next.js 15（App Router）+ TypeScript + Tailwind CSS，构建期 SSG 直读 SQLite
 - 数据库：SQLite（better-sqlite3），文件 `data/delta.db`，**入库真源**
-- 数据同步：`scripts/sync.mjs`（Node ≥ 20，无框架依赖）
+- 数据同步：`scripts/sync.mjs`（Node ≥ 22，无框架依赖；better-sqlite3 按 Node 22 ABI 编译）
 - 部署：阿里云 ECS（Nginx 反代 :3000 + PM2），页面全静态
 
 ## 常用命令

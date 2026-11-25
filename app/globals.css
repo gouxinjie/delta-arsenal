@@ -217,6 +217,21 @@ body::before {
 .anim-fade { animation: fadeIn 0.2s ease-out; }
 .anim-slide { animation: slideInRight 0.28s cubic-bezier(0.22, 0.61, 0.36, 1); }
 
+/* ---------- 首页 Hero 雷达装饰环 ---------- */
+/* 外圈刻度缓慢自转，纯装饰；系统开启「减弱动效」时停止 */
+@keyframes radarSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.radar-spin {
+  transform-box: view-box;
+  transform-origin: 230px 230px;
+  animation: radarSpin 48s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .radar-spin { animation: none; }
+}
+
 /* ---------- 战术面板 ---------- */
 .tac-panel {
   background: linear-gradient(180deg, var(--panel-hi) 0%, var(--panel) 60%);
@@ -265,6 +280,13 @@ body::before {
 
 /* 极简 hover：仅高亮边框，不做位移 / 投影 / 内容变化 */
 .tac-panel.tac-hover-border:hover {
+  border-color: var(--accent);
+}
+
+/* 扁平 hover：无位移、无投影、边框不加粗，仅边框色提亮为强调色（用于入口卡片） */
+.tac-panel.tac-hover-flat:hover {
+  transform: none;
+  box-shadow: none;
   border-color: var(--accent);
 }
 

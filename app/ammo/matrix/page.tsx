@@ -12,8 +12,9 @@ interface MatrixCell {
   penetrates?: boolean;
 }
 
-// 判定规则（官方机制，已交叉验证萌娘百科/官方教程/tierlist 实测数据三源一致）：
+// 常规弹判定规则（游戏基础机制）：
 //   弹穿级高2级以上 → 100% 全额；高1级 → 75%；同级 → 50%（部分穿透）；低于 → 0（打不穿，只耗甲耐久）
+// 注意：源数据中箭矢、龙息、双头弹及特效弹存在非标准衰减，单元格以数据集实测值为准，页面单独标注「特殊机制」
 // 单元格配色走主题变量：暗色主题为高饱和亮色，浅色主题自动换成深色系保证白底可读
 const CELL_STYLES = {
   ok: { icon: '✅', fg: 'var(--t2)', bg: 'var(--ok-bg)' },
@@ -21,11 +22,47 @@ const CELL_STYLES = {
   bad: { icon: '❌', fg: 'var(--danger)', bg: 'var(--bad-bg)' },
 } as const;
 
+/**
+ * 按肉体伤害保留比例归入三档：绿=全额穿透，黄=可穿但有衰减，红=无肉体伤害
+ * 与图例四档（100/75/50/0）对应，仅 100% 显示绿色，避免 90% 等特殊值被误判为高效穿透
+ * @param rate 保留比例（0~1）
+ * @returns 判定档位
+ */
+function toneOf(rate: number): keyof typeof CELL_STYLES {
+  if (rate <= 0) return 'bad';
+  return rate >= 1 ? 'ok' : 'warn';
+}
+
+/**
+ * 判定单元格展示档位与数值
+ * @param cell 矩阵单元格
+ * @returns 档位样式与百分比数值
+ */
 function judge(cell: MatrixCell | undefined) {
-  const rate = Math.round((cell?.body_health_rate ?? 0) * 100);
-  if (cell?.penetrates === false || rate === 0) return { ...CELL_STYLES.bad, rate };
-  if (rate >= 90) return { ...CELL_STYLES.ok, rate };
-  return { ...CELL_STYLES.warn, rate };
+  // penetrates=false 时源数据仍可能带 body_health_rate（如 45-70 的 RN 对 1 级甲为 1），
+  // 必须强制归零，否则会渲染出自相矛盾的「❌ 100%」
+  const rate = cell?.penetrates === false ? 0 : Math.round((cell?.body_health_rate ?? 0) * 100);
+  return { ...CELL_STYLES[toneOf(rate / 100)], rate };
+}
+
+/**
+ * 判断弹药是否偏离「常规四档」穿透规则
+ * 源数据中箭矢、龙息、特效弹等存在非标准衰减（如打高甲仍保留 10%~14%），
+ * 需单独标记，避免用户把图例当作普适结论
+ * @param matrix 穿透矩阵
+ * @param penLevel 弹穿等级
+ * @returns 是否特殊机制
+ */
+function isSpecialAmmo(matrix: Record<string, MatrixCell>, penLevel: number): boolean {
+  return ARMOR_LEVELS.some((lv) => {
+    const cell = matrix[String(lv)];
+    if (!cell) return false;
+    const gap = penLevel - lv;
+    const expected = gap >= 2 ? 1 : gap === 1 ? 0.75 : gap === 0 ? 0.5 : 0;
+    // 用 judge 的展示口径（penetrates=false 归零、百分比取整）与四档数值比对：
+    // 口径统一后，RN 这类「源数据声明未穿透但残留伤害」的弹不会仅因原始字段矛盾被误标
+    return judge(cell).rate !== expected * 100;
+  });
 }
 
 const RARITY_LABEL: Record<string, string> = { 白: '白弹', 绿: '绿弹', 蓝: '蓝弹', 紫: '紫弹', 橙: '金弹', 金: '金弹', 红: '专属弹' };
@@ -87,8 +124,8 @@ export default function MatrixPage() {
         <div className="mt-3.5 pt-3.5 border-t border-edge">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
             <span aria-hidden="true">💡</span>
-            <b className="text-main font-semibold">真实穿透机制</b>
-            <span className="text-[12px] text-muted/80">按弹级与甲级的级差判定</span>
+            <b className="text-main font-semibold">常规穿透机制</b>
+            <span className="text-[12px] text-muted/80">按弹级与甲级级差判定，适用于多数常规弹</span>
           </div>
           <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
             {PEN_RULES.map((rule) => (
@@ -104,7 +141,8 @@ export default function MatrixPage() {
             ))}
           </div>
           <p className="text-[12px] text-muted/80 mt-1.5">
-            数值为肉体伤害保留比例；打不穿时仅消耗护甲耐久。
+            数值为肉体伤害保留比例；打不穿时仅消耗护甲耐久。箭矢、龙息、双头弹及特效弹等特殊弹种不适用该表，
+            标记「特殊」的行以单元格实测值为准。
           </p>
         </div>
 
@@ -113,7 +151,7 @@ export default function MatrixPage() {
           <span className="w-[3px] h-4 rounded bg-accent shrink-0 mt-[3px]" aria-hidden="true" />
           <p className="text-main">
             <b className="text-accent font-semibold mr-1.5">结论</b>
-            想打得动，弹级必须 ≥ 甲级；同级开始掉血，但伤害只有一半。
+            常规弹想打得动，弹级必须 ≥ 甲级；同级开始掉血，但伤害只有一半。
           </p>
         </div>
       </div>
@@ -141,6 +179,8 @@ export default function MatrixPage() {
               const isExclusive = a.pen_level >= 6 || a.rarity === '红';
               const tierColor = isExclusive ? 'var(--danger)' : TIER_COLORS[(a.tier ?? 1) - 1];
               const tierLabel = isExclusive ? '专属弹' : `${a.tier ?? '?'} 阶（${a.rarity ?? '—'}）`;
+              // 穿透衰减偏离常规四档的弹药（箭矢/龙息/双头弹/特效弹等），单独标注
+              const special = isSpecialAmmo(a.m, a.pen_level);
               return (
                 <tr key={a.id} className="border-t border-edge hover:bg-panel/60">
                   <td
@@ -165,6 +205,15 @@ export default function MatrixPage() {
                       >
                         {isExclusive ? '专属' : RARITY_LABEL[a.rarity] ?? `${a.tier}阶`}
                       </span>
+                      {special && (
+                        <span
+                          className="badge shrink-0"
+                          style={{ color: 'var(--warn)', borderColor: 'var(--warn)', opacity: 0.9 }}
+                          title="穿透衰减不遵循常规四档（箭矢/龙息/双头弹/特效弹等），以单元格实测值为准"
+                        >
+                          特殊
+                        </span>
+                      )}
                     </div>
                     <p className="num text-xs text-muted mt-1 ml-0.5">
                       {a.caliber} · {a.rarity ?? '—'}
@@ -191,7 +240,7 @@ export default function MatrixPage() {
         </table>
       </div>
       <p className="text-[13px] leading-[1.7] text-muted mt-4">
-        单元格数值为命中护甲覆盖部位时的肉体伤害保留比例（实测数据），
+        单元格数值取自社区数据集的实测穿透矩阵（非官方），为命中护甲覆盖部位时的肉体伤害保留比例；
         攻击四肢/面部等无防护部位始终为全额伤害。仅供参考，以游戏内实际表现为准。
       </p>
     </div>

@@ -33,7 +33,7 @@ pnpm run dev
 pnpm run build
 ```
 
-> 环境要求：Node ≥ 20（`scripts/sync.mjs` 无框架依赖，可直接运行）。
+> 环境要求：Node ≥ 22（`scripts/sync.mjs` 无框架依赖，可直接运行；better-sqlite3 原生模块按 Node 22 ABI 编译，Node 20 运行会直接崩溃）。
 
 ## 数据链路
 
