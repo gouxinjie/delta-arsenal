@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAllWeapons, getWeapon, getAmmoOfWeapon, getRelatedWeapons } from '@/lib/db';
+import { describeAmmoEffects, parseAmmoEffects } from '@/lib/ammo-effects';
 import { IconRifle } from '@/components/commons/icons';
-import { SLOT_NAMES } from '@/constants/game';
+import { AMMO_EFFECT_TONE, SLOT_NAMES } from '@/constants/game';
 
 export function generateStaticParams() {
   return getAllWeapons().map((w) => ({ id: w.id }));
@@ -73,19 +74,33 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
         <h2 className="font-bold mb-2">适用弹药 <span className="num text-xs text-muted">({ammo.length})</span></h2>
         {ammo.length ? (
           <div className="grid gap-2">
-            {ammo.map((a) => (
-              <Link
-                key={a.id}
-                href={`/ammo?q=${encodeURIComponent(a.name)}`}
-                className={`tac-panel !border-l-2 ${a.tier ? TIER_BORDER[a.tier - 1] : 'border-l-edge'} px-4 py-2 flex items-center gap-3 text-sm hover:border-accent transition-colors`}
-              >
-                <span>{a.name}</span>
-                <span className="num text-xs text-muted ml-auto">
-                  穿透 <b className={a.tier ? TIER_TEXT[a.tier - 1] : ''}>{a.pen_level}</b> 级 · 伤害
-                  {Math.round(a.dmg_ratio * 100)}%
-                </span>
-              </Link>
-            ))}
+            {ammo.map((a) => {
+              // 命中特效（燃烧 / 爆裂）：有则名称后跟一枚标签，悬浮看完整参数
+              const effects = describeAmmoEffects(parseAmmoEffects(a.effects));
+              return (
+                <Link
+                  key={a.id}
+                  href={`/ammo?q=${encodeURIComponent(a.name)}`}
+                  className={`tac-panel !border-l-2 ${a.tier ? TIER_BORDER[a.tier - 1] : 'border-l-edge'} px-4 py-2 flex items-center gap-3 text-sm hover:border-accent transition-colors`}
+                >
+                  <span>{a.name}</span>
+                  {effects.map((e) => (
+                    <span
+                      key={e.key}
+                      className="badge shrink-0"
+                      style={{ color: AMMO_EFFECT_TONE[e.key], borderColor: AMMO_EFFECT_TONE[e.key] }}
+                      title={e.detail}
+                    >
+                      {e.label}
+                    </span>
+                  ))}
+                  <span className="num text-xs text-muted ml-auto">
+                    穿透 <b className={a.tier ? TIER_TEXT[a.tier - 1] : ''}>{a.pen_level}</b> 级 · 伤害
+                    {Math.round(a.dmg_ratio * 100)}%
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <p className="text-sm text-muted">暂无关联弹药数据</p>

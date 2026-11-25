@@ -3,7 +3,7 @@
  * @description 全站通用内联 SVG 图标库（填充 currentColor，尺寸由 className 控制），避免引入图标依赖
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-23
+ * @updated 2026-11-25
  */
 
 /** 图标通用入参 */
@@ -42,12 +42,21 @@ export function IconChart({ className }: IconProps) {
   );
 }
 
-/** 子弹（弹药库页头 / 无贴图口径回退） */
+/**
+ * 子弹（弹药库页头 / 无贴图口径回退）
+ * 按真实整装弹结构绘制：弧形弹头 → 弹壳 → 抽壳沟（收窄）→ 底缘（外凸）
+ */
 export function IconAmmo({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M7 1.5h10L14 7h-4L7 1.5z" />
-      <rect x="9" y="7" width="6" height="16" rx="1.5" />
+      {/* 弹头：锥形收尖，底部略窄于弹壳口，避免整体像一根柱子 */}
+      <path d="M12 1.6c1.6 2.5 3.6 4.8 3.6 6.8H8.4c0-2 2-4.3 3.6-6.8z" />
+      {/* 弹壳主体 */}
+      <path d="M8 8.4h8v10.8H8z" />
+      {/* 抽壳沟：比壳身窄，形成真实的分段台阶 */}
+      <rect x="9.1" y="19.2" width="5.8" height="1.7" />
+      {/* 底缘：比壳身宽，收圆角 */}
+      <rect x="7.1" y="20.9" width="9.8" height="2.3" rx="0.6" />
     </svg>
   );
 }

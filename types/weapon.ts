@@ -5,6 +5,8 @@
  * @updated 2026-11-25
  */
 
+import type { AmmoEffects } from '@/types/ammo';
+
 /** 武器面板参数（源数据字段可能缺省，缺省时按 '—' 展示） */
 export interface WeaponPanel {
   /** 肉体伤害 */
@@ -47,6 +49,8 @@ export interface WeaponAmmoBrief {
   pen_level: number;
   /** 肉体伤害倍率 */
   dmg_ratio: number;
+  /** 命中特效（构建期由 effects JSON 解析而来），无特效为空对象 */
+  effects?: AmmoEffects;
   /** 是否赛季限定（1=是） */
   season_limited: number;
 }

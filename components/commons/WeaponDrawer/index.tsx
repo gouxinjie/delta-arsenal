@@ -9,7 +9,8 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { CALIBER_ICON, SLOT_NAMES } from '@/constants/game';
+import { AMMO_EFFECT_TONE, CALIBER_ICON, SLOT_NAMES } from '@/constants/game';
+import { describeAmmoEffects } from '@/lib/ammo-effects';
 import { IconAmmo, IconRifle } from '@/components/commons/icons';
 import type { WeaponDetail, WeaponPanel } from '@/types/weapon';
 
@@ -54,20 +55,33 @@ function tierColor(tier: number | null): string {
 
 /**
  * 弹药磁贴：口径贴图 + 型号名 + 穿透等级，点击跳转弹药库检索
+ * 有命中特效（燃烧 / 爆裂）时，右上角叠加一枚迷你标签，悬浮可看完整参数
  * @param ammo - 弹药摘要数据
  * @param onClose - 抽屉关闭回调（跳转前收起抽屉）
  */
 function AmmoTile({ ammo, onClose }: { ammo: WeaponDetail['ammo'][number]; onClose: () => void }) {
   const color = tierColor(ammo.tier);
   const src = CALIBER_ICON[ammo.caliber];
+  const effects = describeAmmoEffects(ammo.effects);
+  const effectText = effects.map((e) => e.detail).join(' ');
   return (
     <Link
       href={`/ammo?q=${encodeURIComponent(ammo.name)}`}
       onClick={onClose}
-      title={`${ammo.name} · 穿透 ${ammo.pen_level} 级 · 肉伤 ${Math.round(ammo.dmg_ratio * 100)}%`}
-      className="group/tile flex flex-col items-center gap-1 p-1.5 rounded border bg-bg/60 hover:bg-panel-hi transition-colors"
+      title={`${ammo.name} · 穿透 ${ammo.pen_level} 级 · 肉伤 ${Math.round(ammo.dmg_ratio * 100)}%${effectText ? ` · ${effectText}` : ''}`}
+      className="group/tile relative flex flex-col items-center gap-1 p-1.5 rounded border bg-bg/60 hover:bg-panel-hi transition-colors"
       style={{ borderColor: `color-mix(in srgb, ${color} 45%, transparent)` }}
     >
+      {/* 特效角标：磁贴空间有限，只放类型名，完整参数走 title */}
+      {effects.length > 0 && (
+        <span
+          className="absolute right-0.5 top-0.5 rounded border bg-bg px-1 text-[9px] leading-[14px] pointer-events-none"
+          style={{ color: AMMO_EFFECT_TONE[effects[0].key], borderColor: AMMO_EFFECT_TONE[effects[0].key] }}
+          aria-hidden="true"
+        >
+          {effects[0].label}
+        </span>
+      )}
       {/* 贴图区：统一高度保证磁贴等高 */}
       <span className="h-10 w-full flex items-center justify-center overflow-hidden">
         {src ? (

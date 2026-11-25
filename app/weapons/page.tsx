@@ -1,4 +1,5 @@
 import { getAllWeapons, getAmmoOfWeapon } from '@/lib/db';
+import { parseAmmoEffects } from '@/lib/ammo-effects';
 import WeaponBrowser from '@/components/commons/WeaponBrowser';
 import PageHero from '@/components/commons/PageHero';
 import { IconBook } from '@/components/commons/icons';
@@ -23,6 +24,7 @@ export default function WeaponsPage() {
       tier: a.tier,
       pen_level: a.pen_level,
       dmg_ratio: a.dmg_ratio,
+      effects: parseAmmoEffects(a.effects),
       season_limited: a.season_limited,
     })),
   }));

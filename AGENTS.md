@@ -35,6 +35,7 @@ npm run build    # SSG 构建
 | 图片 | `playerhub.df.qq.com`（腾讯 CDN） | **构建期下载到 `/public/img/`，禁止热链** |
 
 - `tmp/*_cache.json` 是拉取失败的本地回退缓存；**sync 失败优先检查缓存新鲜度**
+- 弹药↔武器关联 = 官方 `gunDetail.ammo` ∪ 按口径补齐（游戏内弹种由口径决定）；两家源口径写法不同（`.300 Blackout` / `12 Gauge` / `7.62x54`），sync 内置 `CALIBER_CANON` 归一表，**新增口径必须先补表**，否则关联会静默丢失
 - `ammo.objectID` 编码规则：`371XYY000001`，`371X`≈口径组，X 位含品阶/穿透信息
 - 弹药品阶映射：白=1 绿=2 蓝=3 紫=4 橙/金=5
 

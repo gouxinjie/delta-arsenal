@@ -6,6 +6,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 
+// 版本守卫：better-sqlite3 原生模块按 Node 22 ABI 编译，
+// 用 Node 20 运行会在 `new Database()` 时直接原生崩溃（0xC0000005，无 JS 堆栈），此处提前给出可读报错
+const NODE_MAJOR = Number(process.versions.node.split('.')[0]);
+if (NODE_MAJOR < 22) {
+  console.error(`[FATAL] sync 需要 Node >= 22（当前 ${process.version}），请切换版本后重试`);
+  process.exit(1);
+}
+
 const ROOT = path.resolve(import.meta.dirname, '..');
 const DATA_DIR = path.join(ROOT, 'data');
 const DB_PATH = path.join(DATA_DIR, 'delta.db');
@@ -36,9 +44,56 @@ async function fetchJSON(key, url) {
   }
 }
 
+/**
+ * 口径写法归一表：武器源与弹药源用词不一致（.300 Blackout / 12 Gauge / 7.62x54 …），
+ * 统一收敛到弹药表的写法，否则按口径匹配关联会整批丢失。
+ * key 一律小写，value 为弹药表中的标准写法。
+ */
+const CALIBER_CANON = {
+  '.300 blackout': '.300BLK',
+  '.338': '.338 Lap Mag',
+  '.338 lapua': '.338 Lap Mag',
+  '.338 lap mag': '.338 Lap Mag',
+  '.357': '.357 Magnum',
+  '.357 magnum': '.357 Magnum',
+  '.45': '.45ACP',
+  '.45 acp': '.45ACP',
+  '.45acp': '.45ACP',
+  '.50': '.50AE',
+  '.50ae': '.50AE',
+  '.50 bmg': '.50 BMG',
+  '12.7x99': '.50 BMG',
+  '12.7x99mm': '.50 BMG',
+  '12': '12Gauge',
+  '12 gauge': '12Gauge',
+  '12gauge': '12Gauge',
+  '4.6x30': '4.6x30mm',
+  '5.45x39': '5.45x39mm',
+  '5.56x45': '5.56x45mm',
+  '5.7x28': '5.7x28mm',
+  '5.8x42': '5.8x42mm',
+  '6.8x51': '6.8x51mm',
+  '7.62x39': '7.62x39mm',
+  '7.62x51': '7.62x51mm',
+  '7.62x54': '7.62x54R',
+  '7.62x54mm': '7.62x54R',
+  '7.62x54r': '7.62x54R',
+  // dfc 源的已知笔误（G3 战斗步枪）
+  'mmo7.62x51': '7.62x51mm',
+  '9x19': '9x19mm',
+  '9x39': '9x39mm',
+  '箭矢': '复合弓',
+};
+
+/**
+ * 口径归一化：剥离 ammo 前缀 + 收敛两家数据源的写法差异
+ * @param {string} c - 原始口径
+ * @returns {string} 归一化后的口径（与弹药表口径可对齐）
+ */
 function normalizeCaliber(c) {
   if (!c) return '';
-  return c.replace(/^ammo/, '').trim();
+  const raw = c.replace(/^ammo/, '').trim();
+  return CALIBER_CANON[raw.toLowerCase()] ?? raw;
 }
 
 /**
@@ -78,11 +133,12 @@ async function main() {
   } catch (e) {
     console.warn(`  [WARN] tierlist weapons 拉取失败，官方图匹配降级: ${e.message}`);
   }
-  // 归一化名称 -> 官方 weapon_id（同 id 重复出现直接覆盖，结果一致）
-  const TIER_ID_BY_NAME = new Map(
+  // 归一化名称 -> 官方 tier 记录（weapon_id 与口径均以官方为准）
+  // 同一武器在 tier 表可能有多条记录（同 id 多品阶），已核实：归一名称命中多条时 id 与口径均唯一，直接覆盖结果一致
+  const TIER_BY_NAME = new Map(
     tierWeapons.map((w) => {
       const key = normalizeName(w.name);
-      return [NAME_ALIAS[key] ?? key, String(w.weapon_id)];
+      return [NAME_ALIAS[key] ?? key, w];
     })
   );
 
@@ -119,9 +175,10 @@ async function main() {
 
   // ---- 2. 构建武器表 ----
   // DFD 为主（面板全 + 官方图），dfc 按别名映射去重后补缺
-  const dfcByName = new Map(dfcWeapons.map((w) => [DFC_ALIAS[w.name] ?? w.name, w]));
   const weapons = [];
   const seenNames = new Set();
+  // id 唯一性防护：dfc 武器统一改用官方 weapon_id 后，需确保不与 dfd 冲突（主键冲突会导致整批写入失败）
+  const seenIds = new Set();
 
   for (const g of dfdWeapons) {
     const gd = g.gunDetail ?? {};
@@ -146,6 +203,7 @@ async function main() {
       source: 'dfd',
     });
     seenNames.add(g.objectName);
+    seenIds.add(String(g.objectID));
   }
   // dfc 分类名与官方（dfd）不一致的归一映射
   const DFC_CATEGORY_MAP = { 突击步枪: '步枪' };
@@ -162,14 +220,23 @@ async function main() {
       'https://cdn.jsdelivr.net/gh/$1/$2@$3/$4'
     );
     const normKey = NAME_ALIAS[normalizeName(w.name)] ?? normalizeName(w.name);
-    const tierId = TIER_ID_BY_NAME.get(normKey);
-    const tierImg = tierId ? `https://playerhub.df.qq.com/playerhub/60004/object/${tierId}.png` : '';
-    if (!tierId) console.warn(`  [WARN] ${w.name} 未匹配到官方 weapon_id，图链降级为 dfc 源`);
+    const tierWeapon = TIER_BY_NAME.get(normKey);
+    // id 统一为官方 weapon_id（与 dfd 武器同一编码体系，图片/详情链接口径一致）；未匹配时回退 dfc 自带 id
+    const officialId = tierWeapon ? String(tierWeapon.weapon_id) : '';
+    const weaponId = officialId || String(w.id);
+    if (!officialId) console.warn(`  [WARN] ${w.name} 未匹配到官方 weapon_id，图链降级为 dfc 源`);
+    if (seenIds.has(weaponId)) {
+      console.warn(`  [WARN] ${w.name} 的 id ${weaponId} 与已入库武器重复，跳过`);
+      continue;
+    }
+    const tierImg = officialId ? `https://playerhub.df.qq.com/playerhub/60004/object/${officialId}.png` : '';
+    // 口径以官方 tier 为准（dfc 存在 K437/KC17/MDR/MK4 口径与游戏不符）；官方口径为空时（如复合弓）回退 dfc
+    const caliber = normalizeCaliber(tierWeapon?.caliber || w.caliber);
     weapons.push({
-      id: w.id,
+      id: weaponId,
       name: w.name,
       category: DFC_CATEGORY_MAP[w.category] ?? w.category ?? '未知',
-      caliber: normalizeCaliber(w.caliber),
+      caliber,
       image: tierImg || dfcImg,
       imageUrls: [...new Set([tierImg, dfcImg, dfcImgMirror])].filter(Boolean),
       imagePre: '',
@@ -185,13 +252,60 @@ async function main() {
     });
     seenNames.add(w.name);
     seenNames.add(officialName);
+    seenIds.add(weaponId);
+  }
+
+  // ---- 2.5 tierlist 武器兜底补充 ----
+  // S12 起官方 DFD 源（47 把）与 dfc 源（0.8.0）更新滞后，新枪（如 AN94）只出现在 tierlist weapons.json；
+  // 该源字段（flesh_damage / panel_attributes / ammo_item_ids）与前端面板模型可直接对应，故作为第三补充源
+  const TIER_CATEGORY = {
+    assaultRifle: '步枪',
+    submachineGun: '冲锋枪',
+    lightMachineGun: '轻机枪',
+    marksmanRifle: '精确射手步枪',
+    sniperRifle: '狙击步枪',
+    pistol: '手枪',
+    specialWeapon: '特殊武器',
+  };
+  /** 按 weapon_id 去重（同一武器在 tier 表存在多条品阶记录） */
+  const tierById = new Map();
+  for (const w of tierWeapons) {
+    const id = String(w.weapon_id);
+    if (!tierById.has(id)) tierById.set(id, w);
+  }
+  for (const [id, w] of tierById) {
+    if (seenIds.has(id)) continue;
+    const pa = w.panel_attributes ?? {};
+    const tierImg = `https://playerhub.df.qq.com/playerhub/60004/object/${id}.png`;
+    weapons.push({
+      id,
+      name: w.name,
+      category: TIER_CATEGORY[w.category_id] ?? w.category ?? '未知',
+      caliber: normalizeCaliber(w.caliber),
+      image: tierImg,
+      imageUrls: [tierImg],
+      imagePre: '',
+      panel: {
+        meatHarm: w.flesh_damage, armorHarm: w.armor_damage, fireRate: w.rpm,
+        effectiveRange: w.valid_range_m, recoil: pa.recoil_control, control: pa.handling,
+        stability: pa.stability, hipFire: pa.waist_accuracy,
+        muzzleVelocity: w.muzzle_velocity_mps, magSize: w.clip_capacity,
+        fireModes: w.fire_modes ?? [], soundRadius: w.acoustics?.shot_distance_m,
+      },
+      slots: [],
+      source: 'tierlist',
+    });
+    seenIds.add(id);
+    seenNames.add(w.name);
+    console.log(`  [补齐] ${w.name}（tierlist 源，官方源与 dfc 均未收录）`);
   }
 
   // ---- 3. 构建弹药表 + 弹药↔武器关联 ----
   const ammoById = new Map(tierAmmo.map((a) => [String(a.ammo_item_id), a]));
   const ammoRows = [];
   for (const [id, a] of ammoById) {
-    const caliber = a.caliber || (a.name.includes('箭矢') ? '复合弓' : '未知');
+    // 口径同样走归一化，保证与武器口径在同一套用词下比对
+    const caliber = normalizeCaliber(a.caliber) || (a.name.includes('箭矢') ? '复合弓' : '未知');
     ammoRows.push({
       id,
       name: a.name,
@@ -202,25 +316,45 @@ async function main() {
       dmg_ratio: a.flesh_damage_multiplier,
       armor_ratio: a.armor_damage_multiplier,
       matrix: a.penetration_matrix ?? {},
+      // 命中特效（燃烧 / 延迟爆裂等），无特效为空对象，供前端生成「特点」摘要
+      effects: a.on_hit_effects ?? {},
       season_limited: a.is_season_limited ? 1 : 0,
+      // 源数据备注：限定弹标注赛季（如「S11赛季限定子弹」），特殊弹标注机制（如「叠层触发爆炸」）
+      note: a.season_note ?? '',
     });
   }
 
+  // 口径 -> 弹药 id 索引
+  const ammoIdsByCaliber = new Map();
+  for (const a of ammoRows) {
+    if (!a.caliber || a.caliber === '未知') continue;
+    if (!ammoIdsByCaliber.has(a.caliber)) ammoIdsByCaliber.set(a.caliber, []);
+    ammoIdsByCaliber.get(a.caliber).push(a.id);
+  }
+
   const ammoWeapons = [];
+  const linked = new Set();
+  /** 写入一条关联（去重：官方关联与口径补齐会重叠） */
+  const pushLink = (ammoId, weaponId) => {
+    const key = `${ammoId}|${weaponId}`;
+    if (linked.has(key)) return;
+    linked.add(key);
+    ammoWeapons.push({ ammo_id: ammoId, weapon_id: weaponId });
+  };
+
   for (const w of weapons) {
     const g = dfdWeapons.find((x) => String(x.objectID) === w.id);
-    if (g) {
-      // dfd 枪：官方 gunDetail.ammo 关联
-      for (const a of g.gunDetail?.ammo ?? []) {
-        ammoWeapons.push({ ammo_id: String(a.objectID), weapon_id: w.id });
-      }
-      continue;
+    // 1) 官方 gunDetail.ammo 关联（权威，但官方列表常只覆盖部分弹种）
+    for (const a of g?.gunDetail?.ammo ?? []) {
+      pushLink(String(a.objectID), w.id);
     }
-    // dfc 补充枪：无官方关联数据，按口径推导（口径决定可用弹药，与游戏规则一致）
-    for (const a of ammoRows) {
-      if (a.caliber && a.caliber === w.caliber) {
-        ammoWeapons.push({ ammo_id: a.id, weapon_id: w.id });
-      }
+    // 2) tierlist 记录的弹种清单（含官方源未覆盖的新枪，如 S12 的 AN94）
+    for (const ammoId of tierById.get(w.id)?.ammo_item_ids ?? []) {
+      pushLink(String(ammoId), w.id);
+    }
+    // 3) 口径补齐：游戏内弹种由口径决定，两家源的口径命名已归一化
+    for (const ammoId of ammoIdsByCaliber.get(w.caliber) ?? []) {
+      pushLink(ammoId, w.id);
     }
   }
 
@@ -228,7 +362,7 @@ async function main() {
   const checks = [
     ['ammo', ammoRows.length, 100],
     ['weapons', weapons.length, 45],
-    ['ammo_weapons 关联', ammoWeapons.length, 60],
+    ['ammo_weapons 关联', ammoWeapons.length, 400],
   ];
   let failed = false;
   for (const [label, n, min] of checks) {
@@ -239,15 +373,25 @@ async function main() {
   if (failed) throw new Error('数据量低于阈值，终止写入');
 
   // ---- 5. 写入 SQLite（全量重建）----
-  if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
+  // 优先删库重建；库文件被占用（如开发服务器持有只读连接）时退化为就地重建，
+  // 避免因文件锁导致整次同步失败。
+  let db;
+  try {
+    if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
+    db = new Database(DB_PATH);
+    db.pragma('journal_mode = WAL');
+  } catch (e) {
+    console.warn(`  [WARN] 旧库无法删除（${e.message}），改为就地重建`);
+    db = new Database(DB_PATH);
+    db.pragma('journal_mode = WAL');
+    for (const t of ['ammo_weapons', 'ammo', 'weapons', 'meta']) db.exec(`DROP TABLE IF EXISTS ${t}`);
+  }
   db.exec(`
     CREATE TABLE ammo (
       id TEXT PRIMARY KEY, name TEXT, caliber TEXT,
       tier INTEGER, rarity TEXT, pen_level INTEGER,
       dmg_ratio REAL, armor_ratio REAL,
-      matrix TEXT, season_limited INTEGER, updated_at TEXT
+      matrix TEXT, effects TEXT, season_limited INTEGER, note TEXT, updated_at TEXT
     );
     CREATE TABLE weapons (
       id TEXT PRIMARY KEY, name TEXT, category TEXT, caliber TEXT,
@@ -265,17 +409,18 @@ async function main() {
   `);
 
   const now = new Date().toISOString();
-  const insAmmo = db.prepare(`INSERT INTO ammo VALUES (@id,@name,@caliber,@tier,@rarity,@pen_level,@dmg_ratio,@armor_ratio,@matrix,@season_limited,@updated_at)`);
+  const insAmmo = db.prepare(`INSERT INTO ammo VALUES (@id,@name,@caliber,@tier,@rarity,@pen_level,@dmg_ratio,@armor_ratio,@matrix,@effects,@season_limited,@note,@updated_at)`);
   const insWeapon = db.prepare(`INSERT INTO weapons VALUES (@id,@name,@category,@caliber,@image,@imagePre,@panel,@slots,@source,@updated_at)`);
   const insAW = db.prepare(`INSERT OR IGNORE INTO ammo_weapons VALUES (@ammo_id,@weapon_id)`);
 
   db.transaction(() => {
-    for (const a of ammoRows) insAmmo.run({ ...a, matrix: JSON.stringify(a.matrix), updated_at: now });
+    for (const a of ammoRows) insAmmo.run({ ...a, matrix: JSON.stringify(a.matrix), effects: JSON.stringify(a.effects), updated_at: now });
     for (const w of weapons) insWeapon.run({ ...w, panel: JSON.stringify(w.panel), slots: JSON.stringify(w.slots), updated_at: now });
     for (const r of ammoWeapons) insAW.run(r);
     const meta = {
       generatedAt: now,
-      season: 'S11',
+      // 与数据源 provenance.json 的 dataset_version（20261105-weiguang.1 = S12「微光」）保持一致
+      season: 'S12',
       sources: JSON.stringify(Object.values(SOURCES).concat('delta-force-core@0.8.0')),
       counts: JSON.stringify({ ammo: ammoRows.length, weapons: weapons.length, links: ammoWeapons.length }),
     };
@@ -367,6 +512,10 @@ async function main() {
   console.log(`  弹药: ${ammoRows.length} 条 | 武器: ${weapons.length} 条 | 关联: ${ammoWeapons.length} 条`);
   console.log(`  口径分布:`, caliberDist);
   console.log(`  输出: ${DB_PATH}`);
+  // WAL 模式下必须显式合并回主库文件：dev 服务常持有只读连接，仅 close() 不会 checkpoint，
+  // 会导致 data/delta.db 主文件仍是旧数据（改动全留在被 gitignore 的 -wal 里）
+  const ckpt = db.pragma('wal_checkpoint(TRUNCATE)');
+  console.log(`  WAL 合并: ${JSON.stringify(ckpt)}`);
   db.close();
 }
 

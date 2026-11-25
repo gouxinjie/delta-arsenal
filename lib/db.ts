@@ -33,8 +33,22 @@ export interface AmmoRow {
   armor_ratio: number;
   /** 穿透矩阵 JSON 字符串 */
   matrix: string;
+  /** 命中特效 JSON 字符串（燃烧 / 延迟爆裂，无特效为 {}） */
+  effects: string;
   /** 是否赛季限定 */
   season_limited: number;
+  /** 弹药备注：限定弹标注赛季，特殊弹标注机制，可为空串 */
+  note: string;
+}
+
+/** 弹药关联武器简要信息（弹药详情抽屉展示枪械缩略图用） */
+export interface AmmoWeaponBrief {
+  /** 武器 objectID（用于跳转 /weapons/[id]） */
+  id: string;
+  /** 武器名 */
+  name: string;
+  /** 本地图片路径，空串表示该枪无官方图 */
+  image: string;
 }
 
 /** 武器数据行 */
@@ -90,6 +104,28 @@ export function getAmmoWithWeapons(): (AmmoRow & { weaponNames: string })[] {
        GROUP BY a.id ORDER BY a.caliber, a.pen_level DESC`
     )
     .all() as (AmmoRow & { weaponNames: string })[];
+}
+
+/**
+ * 读取「弹药 -> 适用武器」映射（含武器图片，供弹药详情抽屉展示）
+ * @returns 以弹药 itemID 为键的武器简要信息数组（组内按名称排序）
+ */
+export function getAmmoWeaponMap(): Record<string, AmmoWeaponBrief[]> {
+  const rows = db()
+    .prepare(
+      `SELECT aw.ammo_id AS ammoId, w.id AS id, w.name AS name, COALESCE(w.image, '') AS image
+       FROM ammo_weapons aw
+       JOIN weapons w ON w.id = aw.weapon_id
+       ORDER BY w.name`
+    )
+    .all() as { ammoId: string; id: string; name: string; image: string }[];
+
+  const map: Record<string, AmmoWeaponBrief[]> = {};
+  for (const { ammoId, id, name, image } of rows) {
+    if (!map[ammoId]) map[ammoId] = [];
+    map[ammoId].push({ id, name, image });
+  }
+  return map;
 }
 
 /**

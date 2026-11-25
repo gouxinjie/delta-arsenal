@@ -21,7 +21,7 @@ export default function PageHero({ title, subtitle, icon }: PageHeroProps) {
   return (
     /* mx 负 margin 全宽突破内容容器（需 body overflow-x-hidden 配合），还原设计稿全宽横幅 */
     <section
-      className="relative mx-[calc(50%-50vw)] mb-6 overflow-hidden border-b border-accent/25 bg-panel/40 sm:mb-7"
+      className="relative mx-[calc(50%-50vw)] mb-4 overflow-hidden border-b border-accent/25 bg-panel/40"
       aria-labelledby="page-hero-title"
     >
       {/* 氛围层 1：主题化渐变底（暗色为深青绿，浅色为白→淡青绿） */}

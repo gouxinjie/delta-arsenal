@@ -70,8 +70,6 @@ export default function Header() {
                 isActive(n.href) ? 'text-accent nav-glow' : 'text-muted hover:text-main'
               }`}
             >
-              {/* 选中态底衬 + 底部青绿辉光线（贯穿项宽） */}
-              {isActive(n.href) && <span className="absolute inset-0 bg-accent/10 rounded" aria-hidden="true" />}
               <span className="relative">{n.label}</span>
               {isActive(n.href) && (
                 <span className="absolute bottom-0 inset-x-1 h-[2px] bg-accent rounded nav-line" aria-hidden="true" />

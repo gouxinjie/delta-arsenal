@@ -68,6 +68,10 @@
   --overlay: rgba(0, 0, 0, 0.6);
   --overlay-soft: rgba(0, 0, 0, 0.25);
 
+  /* 滚动条滑块（中性灰蓝，不参与强调色体系，避免页面到处泛绿） */
+  --scroll-thumb: rgba(127, 147, 163, 0.26);
+  --scroll-thumb-hover: rgba(127, 147, 163, 0.48);
+
   /* 穿透徽章底 */
   --chip-bg: rgba(0, 0, 0, 0.3);
 
@@ -131,6 +135,10 @@
 
   --overlay: rgba(16, 24, 40, 0.35);
   --overlay-soft: rgba(16, 24, 40, 0.2);
+
+  /* 滚动条滑块：浅色主题用低饱和灰，白底上更干净 */
+  --scroll-thumb: rgba(102, 112, 133, 0.28);
+  --scroll-thumb-hover: rgba(102, 112, 133, 0.5);
 
   --chip-bg: rgba(16, 24, 40, 0.04);
 
@@ -248,6 +256,12 @@ body::before {
   border-color: var(--border-hi);
 }
 
+/* 无顶部装饰线变体：窄面板（如筛选栏）上切角线与标题分隔线易视觉冲突，可按需关闭 */
+.tac-panel.tac-panel-plain::before,
+.tac-panel.tac-panel-plain::after {
+  content: none;
+}
+
 /* 可点击卡片：hover 抬升 + 主题化投影 */
 .tac-hover:hover {
   border-color: var(--hover-line) !important;
@@ -308,16 +322,18 @@ body::before {
   color: var(--muted);
 }
 
+/**
+ * 下拉框：去掉浏览器默认外观，箭头改由组件内的 SVG 绘制。
+ * 不用 background-image 画箭头——原生弹层展开瞬间会重绘控件，
+ * 背景图会短暂消失造成「闪一下」，独立元素绘制无此问题。
+ */
 select {
   appearance: none;
+  -webkit-appearance: none;
   background-color: var(--bg);
   color: var(--text);
+  cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: calc(100% - 16px) 55%, calc(100% - 11px) 55%;
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
 }
 select:hover {
   border-color: var(--border-hi);
@@ -351,8 +367,19 @@ table.matrix-table th {
   text-shadow: var(--title-glow);
 }
 
-/* ---------- 滚动条 ---------- */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* ---------- 滚动条：细条 + 低饱和滑块，不抢视觉、不泛绿 ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+::-webkit-scrollbar-corner { background: transparent; }
+/* Firefox 不认 ::-webkit-scrollbar，用标准属性兜底（Chrome 支持标准属性后会忽略上方样式，故此处隔离） */
+@supports (-moz-appearance: none) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
+}

@@ -60,7 +60,7 @@ export default function MatrixPage() {
       />
 
       {/* 阅读图例：术语 → 判定机制 → 结论 三段式，段间用细分隔线，字号 13px 提升可读性 */}
-      <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-4 mb-5 text-[13px] leading-[1.7] text-muted">
+      <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-4 mb-4 text-[13px] leading-[1.7] text-muted">
         {/* 术语说明：图标独立成列，保证三段文案左缘对齐、换行不参差 */}
         <div className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2 xl:grid-cols-3">
           <div className="flex gap-2">
@@ -122,7 +122,7 @@ export default function MatrixPage() {
         <table className="matrix-table w-full text-sm min-w-[780px]">
           <thead>
             <tr className="bg-panel">
-              <th className="sticky left-0 bg-panel z-10 px-3 py-3 text-left min-w-[220px] text-xs tracking-wider text-muted">
+              <th className="sticky left-0 bg-panel z-10 px-3 py-3 text-left min-w-[220px] text-[13px] tracking-wider text-muted">
                 <span className="text-accent font-semibold">你的子弹</span>（按穿透等级排序）
               </th>
               {ARMOR_LEVELS.map((lv) => (
@@ -190,7 +190,7 @@ export default function MatrixPage() {
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted mt-3">
+      <p className="text-[13px] leading-[1.7] text-muted mt-4">
         单元格数值为命中护甲覆盖部位时的肉体伤害保留比例（实测数据），
         攻击四肢/面部等无防护部位始终为全额伤害。仅供参考，以游戏内实际表现为准。
       </p>

@@ -27,6 +27,12 @@ export const CALIBER_ICON: Record<string, string> = {
   '9x39mm': '/img/ammo/9x39mm.png',
 };
 
+/** 弹药命中特效 -> 徽章配色（燃烧金橙 / 爆裂红），AmmoBrowser 与武器详情共用 */
+export const AMMO_EFFECT_TONE: Record<'burn' | 'detonation', string> = {
+  burn: 'var(--t5)',
+  detonation: 'var(--danger)',
+};
+
 /** 改装槽位编号 -> 中文槽位名 */
 export const SLOT_NAMES: Record<string, string> = {
   '1': '瞄具',
