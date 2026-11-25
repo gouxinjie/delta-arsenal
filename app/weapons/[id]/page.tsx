@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAllWeapons, getWeapon, getAmmoOfWeapon, getRelatedWeapons } from '@/lib/db';
 import { IconRifle } from '@/components/commons/icons';
+import { SLOT_NAMES } from '@/constants/game';
 
 export function generateStaticParams() {
   return getAllWeapons().map((w) => ({ id: w.id }));
@@ -15,14 +16,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 const TIER_TEXT = ['text-t1', 'text-t2', 'text-t3', 'text-t4', 'text-t5'];
 const TIER_BORDER = ['border-l-t1', 'border-l-t2', 'border-l-t3', 'border-l-t4', 'border-l-t5'];
-
-const SLOT_NAMES: Record<string, string> = {
-  '1': '瞄具', '2': '枪口', '3': '枪管', '4': '护木', '5': '弹匣', '6': '枪托',
-  '8': '前握把', '10': '后握把', '11': '导轨', '14': '功能性配件', '17': '侧导轨',
-  '19': '机匣盖', '20': '战术灯', '31': '枪口下挂', '32': '弹鼓', '34': '拉机柄',
-  '35': '上导轨', '38': '枪管下导轨', '40': '枪口附件', '44': '下挂榴弹', '45': '枪带环',
-  '50': '通用导轨',
-};
 
 export default async function WeaponDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

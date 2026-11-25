@@ -1,13 +1,13 @@
 /**
  * @component WeaponBrowser
- * @description 武器图鉴浏览器：按类型 Tab（带图标 + 计数）筛选，卡片网格展示，图片懒加载并处理加载失败占位
+ * @description 武器图鉴浏览器：按类型 Tab（带图标 + 计数）筛选，卡片网格展示，点击卡片从左侧弹出详情抽屉（不跳页）
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-24
+ * @updated 2026-11-25
  */
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   IconGrid,
@@ -20,6 +20,8 @@ import {
   IconPistol,
   IconUnknown,
 } from '@/components/commons/icons';
+import WeaponDrawer from '@/components/commons/WeaponDrawer';
+import type { WeaponDetail, WeaponPanel } from '@/types/weapon';
 
 /** 卡片武器图：无图或加载失败时显示枪械剪影占位（配合数据源图片缺失场景） */
 function WeaponImage({ src, alt }: { src: string; alt: string }) {
@@ -42,41 +44,8 @@ function WeaponImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-/** 武器卡片展示模型 */
-interface WeaponCard {
-  /** 武器 objectID */
-  id: string;
-  /** 武器名称 */
-  name: string;
-  /** 类别（步枪/冲锋枪等） */
-  category: string;
-  /** 口径 */
-  caliber: string;
-  /** 本地图片路径 */
-  image: string;
-  /** 面板参数（与武器详情页 panel 字段同源，缺值按 '—' 展示） */
-  panel: {
-    /** 肉体伤害 */
-    meatHarm?: number;
-    /** 护甲伤害 */
-    armorHarm?: number;
-    /** 射速（发/分） */
-    fireRate?: number;
-    /** 有效射程 */
-    effectiveRange?: number;
-    /** 后坐力 */
-    recoil?: number;
-    /** 操控 */
-    control?: number;
-    /** 稳定性 */
-    stability?: number;
-    /** 腰射精度 */
-    hipFire?: number;
-  };
-}
-
 /** 卡片参数栏配置：8 项等宽平铺（对齐参考图排版） */
-const CARD_STATS: { key: keyof WeaponCard['panel']; label: string }[] = [
+const CARD_STATS: { key: keyof WeaponPanel; label: string }[] = [
   { key: 'meatHarm', label: '肉伤' },
   { key: 'armorHarm', label: '甲伤' },
   { key: 'fireRate', label: '射速' },
@@ -105,16 +74,42 @@ const HOT_WEAPONS = new Set(['MP5冲锋枪', 'M4A1突击步枪', 'AK-12突击步
 
 /** WeaponBrowser 组件入参 */
 interface WeaponBrowserProps {
-  /** 武器列表 */
-  weapons: WeaponCard[];
+  /** 武器列表（含抽屉所需的弹药与槽位数据） */
+  weapons: WeaponDetail[];
 }
 
 export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
   const [tab, setTab] = useState('全部');
+  /** 当前抽屉中展示的武器，null 表示抽屉关闭 */
+  const [selected, setSelected] = useState<WeaponDetail | null>(null);
+  const closeDrawer = useCallback(() => setSelected(null), []);
+
   const list = useMemo(
     () => (tab === '全部' ? weapons : weapons.filter((w) => w.category === tab)),
     [weapons, tab]
   );
+
+  /** 各面板数值字段在全库中的最大值，供抽屉进度条等比换算 */
+  const statMax = useMemo(() => {
+    const max: Record<string, number> = {};
+    for (const w of weapons) {
+      for (const [key, value] of Object.entries(w.panel)) {
+        if (typeof value === 'number') max[key] = Math.max(max[key] ?? 0, value);
+      }
+    }
+    return max;
+  }, [weapons]);
+
+  /**
+   * 卡片点击：阻止默认跳转并打开左侧抽屉；带修饰键（Ctrl/Cmd/Shift）或中键点击时保留浏览器原生新标签页行为
+   * @param e - 卡片点击事件
+   * @param w - 被点击的武器
+   */
+  const openDrawer = (e: React.MouseEvent<HTMLAnchorElement>, w: WeaponDetail) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    setSelected(w);
+  };
 
   return (
     <div>
@@ -144,13 +139,16 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
       </div>
 
       {/* 武器卡片网格 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((w) => {
           const hot = HOT_WEAPONS.has(w.name);
           return (
             <Link
               key={w.id}
               href={`/weapons/${w.id}`}
+              onClick={(e) => openDrawer(e, w)}
+              aria-haspopup="dialog"
+              aria-label={`查看 ${w.name} 详情`}
               className="tac-panel tac-hover rounded-lg overflow-hidden group flex flex-col"
             >
               {/* 标题区：武器名 + 类别·口径，热门角标靠右 */}
@@ -194,6 +192,9 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
         })}
       </div>
       {!list.length && <p className="text-muted text-sm py-10 text-center">该分类暂无收录</p>}
+
+      {/* 详情抽屉：左侧滑出，展示弹药 / 属性 / 槽位 */}
+      <WeaponDrawer weapon={selected} statMax={statMax} onClose={closeDrawer} />
     </div>
   );
 }

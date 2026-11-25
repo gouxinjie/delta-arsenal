@@ -87,8 +87,14 @@ body::before {
   from { opacity: 0; transform: translateX(24px); }
   to { opacity: 1; transform: translateX(0); }
 }
+/* 右侧抽屉入场：面板从屏幕右缘外整体滑入，位移按自身宽度计算不会被裁切 */
+@keyframes drawerInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
 .anim-fade { animation: fadeIn 0.2s ease-out; }
 .anim-slide { animation: slideInRight 0.28s cubic-bezier(0.22, 0.61, 0.36, 1); }
+.anim-drawer-right { animation: drawerInRight 0.3s cubic-bezier(0.22, 0.61, 0.36, 1); }
 
 /* ---------- 战术面板 ---------- */
 .tac-panel {

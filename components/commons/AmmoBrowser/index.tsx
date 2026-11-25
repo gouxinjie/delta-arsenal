@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { IconAmmo } from '@/components/commons/icons';
+import { CALIBER_ICON } from '@/constants/game';
 
 /** 弹药展示模型（来自 lib/db 的 getAmmoWithWeapons 聚合结果） */
 interface AmmoItem {
@@ -38,28 +39,6 @@ interface AmmoItem {
 
 const TIER_COLOR = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
 const RARITY_LABEL: Record<string, string> = { 白: '白弹', 绿: '绿弹', 蓝: '蓝弹', 紫: '紫弹', 橙: '金弹', 金: '金弹', 红: '专属弹' };
-
-/** 口径 -> 本地弹药贴图路径（playerhub 官方贴图，按口径区分） */
-const CALIBER_ICON: Record<string, string> = {
-  '.300BLK': '/img/ammo/300BLK.png',
-  '.338 Lap Mag': '/img/ammo/338.png',
-  '.357 Magnum': '/img/ammo/357.png',
-  '.45ACP': '/img/ammo/45-ACP.png',
-  '.50AE': '/img/ammo/50-AE.png',
-  '12.7x55': '/img/ammo/12.7x55.png',
-  '12Gauge': '/img/ammo/12-Gauge.png',
-  '4.6x30mm': '/img/ammo/4.6x30mm.png',
-  '5.45x39mm': '/img/ammo/5.45x39mm.png',
-  '5.56x45mm': '/img/ammo/5.56x45mm.png',
-  '5.7x28mm': '/img/ammo/5.7x28mm.png',
-  '5.8x42mm': '/img/ammo/5.8x42mm.png',
-  '6.8x51mm': '/img/ammo/6.8x51mm.png',
-  '7.62x39mm': '/img/ammo/7.62x39mm.png',
-  '7.62x51mm': '/img/ammo/7.62x51mm.png',
-  '7.62x54R': '/img/ammo/7.62x54mm.png',
-  '9x19mm': '/img/ammo/9x19mm.png',
-  '9x39mm': '/img/ammo/9x39mm.png',
-};
 
 /**
  * 口径图标：优先使用官方真实贴图，无贴图时回退到子弹 SVG
