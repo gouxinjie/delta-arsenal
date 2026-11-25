@@ -78,7 +78,12 @@ function PenBadge({ pen }: { pen: number }) {
   return (
     <span
       className="num font-bold text-lg w-9 h-9 inline-flex items-center justify-center rounded border"
-      style={{ color, borderColor: color, background: 'rgba(0,0,0,0.3)', boxShadow: `0 0 12px ${color}22` }}
+      style={{
+        color,
+        borderColor: color,
+        background: 'var(--chip-bg)',
+        boxShadow: `0 0 12px color-mix(in srgb, ${color} 18%, transparent)`,
+      }}
       title={`穿透等级 ${pen} 级`}
     >
       {pen}
@@ -254,9 +259,9 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
 
       {/* 详情侧滑抽屉 */}
       {selected && (
-        <div className="fixed inset-0 z-50 bg-black/60 anim-fade" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 z-50 bg-[color:var(--overlay)] anim-fade" onClick={() => setSelected(null)}>
           <div
-            className="absolute right-0 top-0 h-full w-full sm:w-96 bg-panel border-l border-edge p-6 overflow-y-auto anim-slide"
+            className="absolute right-0 top-0 h-full w-full sm:w-96 bg-panel border-l border-edge p-6 overflow-y-auto anim-slide [box-shadow:var(--drawer-shadow)]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between">

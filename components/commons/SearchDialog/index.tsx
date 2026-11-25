@@ -3,11 +3,12 @@
  * @description 全局搜索弹窗：模糊匹配武器/弹药/口径，键盘 Enter 直达、Esc 关闭；索引从 /search-index.json 加载
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-24
+ * @updated 2026-11-25
  */
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { IconSearch } from '@/components/commons/icons';
 
@@ -81,12 +82,18 @@ export default function SearchDialog() {
         <kbd className="key-chip hidden sm:inline">Ctrl + K</kbd>
       </button>
 
-      {open && (
+      {/* 弹窗通过 Portal 挂到 body：Header 的 backdrop-blur 会成为 fixed 后代的包含块，
+          直接渲染会把遮罩裁进头部那一条（浅色主题下尤其明显）。
+          open 只由点击事件置为 true，SSR 阶段不会访问 document，额外加保护更稳妥 */}
+      {open && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm anim-fade flex items-start justify-center pt-24 px-4"
+          className="fixed inset-0 z-50 bg-[color:var(--overlay)] anim-fade flex items-start justify-center pt-24 px-4"
           onClick={() => setOpen(false)}
         >
-          <div className="tac-panel w-full max-w-lg p-3 anim-slide" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="tac-panel w-full max-w-lg p-3 anim-slide [box-shadow:var(--modal-shadow)]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-2 bg-bg border border-edge rounded px-3 focus-within:border-accent">
               <IconSearch className="w-4 h-4 text-muted shrink-0" />
               <input
@@ -123,7 +130,8 @@ export default function SearchDialog() {
               {q && !results.length && <li className="px-3 py-4 text-sm text-muted">没有找到「{q}」</li>}
             </ul>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

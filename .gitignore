@@ -6,3 +6,7 @@ data/*.db-wal
 .next/
 .env*
 .DS_Store
+# 浏览器自动化会话产物（每次执行 playwright/agent-browser 都会生成）
+.playwright-cli/
+# TypeScript 增量编译缓存
+*.tsbuildinfo

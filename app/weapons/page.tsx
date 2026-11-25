@@ -32,7 +32,6 @@ export default function WeaponsPage() {
       <PageHero
         title="武器图鉴"
         icon={<IconBook className="w-6 h-6" />}
-        decoImage="/img/weapons/18020000001.png"
         subtitle={
           <>
             共收录 <b className="text-accent num">{weapons.length}</b>{' '}

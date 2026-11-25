@@ -38,7 +38,7 @@ function WeaponImage({ src, alt }: { src: string; alt: string }) {
       src={src}
       alt={alt}
       loading="lazy"
-      className="max-h-full max-w-full object-contain opacity-90 transition-all duration-300 group-hover:opacity-100 group-hover:scale-105 drop-shadow-[0_3px_8px_rgba(47,227,164,0.1)] group-hover:drop-shadow-[0_5px_14px_rgba(47,227,164,0.2)]"
+      className="weapon-img max-h-full max-w-full object-contain opacity-90 group-hover:opacity-100 group-hover:scale-105"
       onError={() => setErr(true)}
     />
   );
@@ -125,7 +125,7 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
               onClick={() => setTab(t.label)}
               className={`flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border transition-colors ${
                 active
-                  ? 'bg-accent text-bg border-accent font-semibold shadow-[0_0_16px_rgba(47,227,164,0.35)]'
+                  ? 'bg-accent text-[color:var(--on-accent)] border-accent font-semibold [box-shadow:var(--tab-glow)]'
                   : 'border-edge bg-panel/60 text-muted hover:text-main hover:border-border-hi'
               }`}
             >
@@ -168,7 +168,7 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
               </div>
 
               {/* 图片区：扁平宽幅 + 暗底径向渐变，枪械图不压过文字信息 */}
-              <div className="relative aspect-[3/1] flex items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(47,227,164,0.05),transparent_70%)] bg-bg px-5">
+              <div className="thumb-bg relative aspect-[3/1] flex items-center justify-center overflow-hidden bg-bg px-5">
                 <WeaponImage src={w.image} alt={w.name} />
               </div>
 

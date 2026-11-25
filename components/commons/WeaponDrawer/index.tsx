@@ -132,14 +132,14 @@ export default function WeaponDrawer({ weapon, statMax, onClose }: WeaponDrawerP
   return (
     <div className="fixed inset-0 z-50">
       {/* 遮罩：轻量压暗，保留背景可辨识度，点击关闭 */}
-      <div className="absolute inset-0 bg-black/25 anim-fade" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-[color:var(--overlay-soft)] anim-fade" onClick={onClose} aria-hidden="true" />
 
       {/* 抽屉主体：右侧滑出 */}
       <aside
         role="dialog"
         aria-modal="true"
         aria-label={`${weapon.name} 详情`}
-        className="absolute right-0 top-0 h-full w-full sm:max-w-[560px] bg-panel border-l border-edge shadow-[-8px_0_40px_rgba(0,0,0,0.45)] flex flex-col anim-drawer-right"
+        className="absolute right-0 top-0 h-full w-full sm:max-w-[560px] bg-panel border-l border-edge [box-shadow:var(--drawer-shadow)] flex flex-col anim-drawer-right"
       >
         {/* 头部：缩略图 + 名称 + 类别口径 + 关闭按钮 */}
         <header className="relative shrink-0 px-5 pt-5 pb-4 border-b border-edge">
@@ -204,7 +204,7 @@ export default function WeaponDrawer({ weapon, statMax, onClose }: WeaponDrawerP
                     <span className="text-[11px] text-muted w-16 shrink-0 whitespace-nowrap">{s.label}</span>
                     <span className="flex-1 h-1 rounded-full bg-edge overflow-hidden">
                       <span
-                        className="block h-full rounded-full bg-gradient-to-r from-accent/40 to-accent shadow-[0_0_6px_rgba(47,227,164,0.45)]"
+                        className="block h-full rounded-full bg-gradient-to-r from-accent/40 to-accent [box-shadow:var(--bar-glow)]"
                         style={{ width: `${pct}%` }}
                       />
                     </span>

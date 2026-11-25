@@ -10,6 +10,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import SearchDialog from '@/components/commons/SearchDialog';
+import ThemeToggle from '@/components/commons/ThemeToggle';
 
 /** 主导航项配置 */
 const NAV = [
@@ -42,13 +43,14 @@ export default function Header() {
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
           <svg
             viewBox="0 0 32 32"
-            className="w-7 h-7 drop-shadow-[0_0_12px_rgba(47,227,164,0.55)] transition-transform group-hover:scale-105"
+            className="w-7 h-7 transition-transform group-hover:scale-105"
+            style={{ filter: 'drop-shadow(0 0 12px var(--logo-glow))' }}
             aria-hidden="true"
           >
             <defs>
               <linearGradient id="logo-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8affd4" />
-                <stop offset="100%" stopColor="#14b87e" />
+                <stop offset="0%" stopColor="var(--logo-a)" />
+                <stop offset="100%" stopColor="var(--logo-b)" />
               </linearGradient>
             </defs>
             <path d="M16 3 L30 28 H2 Z" fill="url(#logo-grad)" />
@@ -78,7 +80,8 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
           <SearchDialog />
         </div>
       </div>

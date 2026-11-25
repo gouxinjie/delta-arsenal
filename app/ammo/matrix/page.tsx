@@ -14,10 +14,11 @@ interface MatrixCell {
 
 // 判定规则（官方机制，已交叉验证萌娘百科/官方教程/tierlist 实测数据三源一致）：
 //   弹穿级高2级以上 → 100% 全额；高1级 → 75%；同级 → 50%（部分穿透）；低于 → 0（打不穿，只耗甲耐久）
+// 单元格配色走主题变量：暗色主题为高饱和亮色，浅色主题自动换成深色系保证白底可读
 const CELL_STYLES = {
-  ok: { icon: '✅', fg: '#4ade80', bg: 'rgba(74,222,128,0.05)' },
-  warn: { icon: '⚠️', fg: '#ffc94d', bg: 'rgba(255,201,77,0.14)' },
-  bad: { icon: '❌', fg: '#ff5f5f', bg: 'rgba(255,95,95,0.12)' },
+  ok: { icon: '✅', fg: 'var(--t2)', bg: 'var(--ok-bg)' },
+  warn: { icon: '⚠️', fg: 'var(--t5)', bg: 'var(--warn-bg)' },
+  bad: { icon: '❌', fg: 'var(--danger)', bg: 'var(--bad-bg)' },
 } as const;
 
 function judge(cell: MatrixCell | undefined) {
@@ -29,6 +30,14 @@ function judge(cell: MatrixCell | undefined) {
 
 const RARITY_LABEL: Record<string, string> = { 白: '白弹', 绿: '绿弹', 蓝: '蓝弹', 紫: '紫弹', 橙: '金弹', 金: '金弹', 红: '专属弹' };
 const TIER_COLORS = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
+
+// 图例中的穿透判定四档（与 judge() 阈值保持一致，改规则时两处同步）
+const PEN_RULES: { label: string; rate: string; icon: string; tone: string }[] = [
+  { label: '高 2 级以上', rate: '100%', icon: '✅', tone: 'text-t2' },
+  { label: '高 1 级', rate: '75%', icon: '⚠️', tone: 'text-t5' },
+  { label: '等级相同', rate: '50%', icon: '⚠️', tone: 'text-warn' },
+  { label: '低于甲级', rate: '0%', icon: '❌', tone: 'text-danger' },
+];
 
 export default function MatrixPage() {
   // 排序（第一版）：全局按穿透等级从高到低，同等级按口径字母序
@@ -42,7 +51,6 @@ export default function MatrixPage() {
       <PageHero
         title="穿甲对照矩阵"
         icon={<IconChart className="w-6 h-6" />}
-        decoImage="/img/weapons/18010000001.png"
         subtitle={
           <>
             弹种 × 护甲等级速查：<b className="text-t2">✅ 高效穿透</b> ｜ <b className="text-warn">⚠️ 可穿但衰减明显</b> ｜{' '}
@@ -51,33 +59,66 @@ export default function MatrixPage() {
         }
       />
 
-      {/* 阅读图例（青绿边框面板） */}
-      <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3.5 mb-5 text-xs leading-relaxed">
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-muted">
-          <span>
-            🎯 <b className="text-main">穿N</b> = 穿透等级（0–7），玩家俗称「N级弹」
-          </span>
-          <span>
-            📦 <b className="text-main">品阶徽章</b>：白→绿→蓝→紫→金弹，与游戏内颜色一致
-          </span>
-          <span>
-            <b className="text-danger">穿6/穿7</b> = 狙击枪/重机枪专属弹（红标），不适用常规品阶
-          </span>
+      {/* 阅读图例：术语 → 判定机制 → 结论 三段式，段间用细分隔线，字号 13px 提升可读性 */}
+      <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-4 mb-5 text-[13px] leading-[1.7] text-muted">
+        {/* 术语说明：图标独立成列，保证三段文案左缘对齐、换行不参差 */}
+        <div className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="flex gap-2">
+            <span className="shrink-0" aria-hidden="true">🎯</span>
+            <span>
+              <b className="text-main font-semibold">穿N</b>：穿透等级（0–7），俗称「N 级弹」
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <span className="shrink-0" aria-hidden="true">📦</span>
+            <span>
+              <b className="text-main font-semibold">品阶徽章</b>：白→绿→蓝→紫→金弹，与游戏内颜色一致
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <span className="shrink-0" aria-hidden="true">🔴</span>
+            <span>
+              <b className="text-danger font-semibold">穿6/穿7</b>：狙击枪/重机枪专属弹（红标），不占常规品阶
+            </span>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-muted mt-2.5 pt-2.5 border-t border-edge">
-          <span>
-            💡 <b className="text-main">真实穿透机制</b>：高 2 级以上 → ✅ 100% 全额 ｜ 高 1 级 → ⚠️ 75% ｜ 同级 → ⚠️
-            50%（部分穿透）｜ 低于 → ❌ 0%（打不穿，只耗护甲耐久）
-          </span>
+
+        {/* 判定机制：四档并列成卡片，配色与表格单元格一致，便于对照扫读 */}
+        <div className="mt-3.5 pt-3.5 border-t border-edge">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2">
+            <span aria-hidden="true">💡</span>
+            <b className="text-main font-semibold">真实穿透机制</b>
+            <span className="text-[12px] text-muted/80">按弹级与甲级的级差判定</span>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
+            {PEN_RULES.map((rule) => (
+              <div
+                key={rule.label}
+                className="flex items-center justify-between gap-2 rounded border border-edge/70 bg-bg/50 px-2.5 py-1.5"
+              >
+                <span className="num text-[12px]">{rule.label}</span>
+                <span className={`num text-[12px] font-semibold ${rule.tone}`}>
+                  {rule.icon} {rule.rate}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[12px] text-muted/80 mt-1.5">
+            数值为肉体伤害保留比例；打不穿时仅消耗护甲耐久。
+          </p>
         </div>
-        <div className="flex items-center gap-2 text-main mt-2.5 pt-2.5 border-t border-edge">
-          <span className="w-[3px] h-4 rounded bg-accent" aria-hidden="true" />
-          <b className="text-accent">结论</b>
-          <span>想打得动，弹级必须 ≥ 甲级；同级开始掉血但只有一半</span>
+
+        {/* 结论：左侧强调竖条 + 加粗标签，与正文区分层级 */}
+        <div className="flex items-start gap-2 mt-3.5 pt-3.5 border-t border-edge">
+          <span className="w-[3px] h-4 rounded bg-accent shrink-0 mt-[3px]" aria-hidden="true" />
+          <p className="text-main">
+            <b className="text-accent font-semibold mr-1.5">结论</b>
+            想打得动，弹级必须 ≥ 甲级；同级开始掉血，但伤害只有一半。
+          </p>
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-edge rounded-lg shadow-lg shadow-black/20">
+      <div className="overflow-x-auto border border-edge rounded-lg [box-shadow:var(--panel-shadow)]">
         <table className="matrix-table w-full text-sm min-w-[780px]">
           <thead>
             <tr className="bg-panel">
@@ -86,9 +127,9 @@ export default function MatrixPage() {
               </th>
               {ARMOR_LEVELS.map((lv) => (
                 <th key={lv} className="px-3 py-3">
-                  <span className="num text-accent inline-flex items-center gap-1.5">
+                  <span className="num text-accent inline-flex items-center gap-1.5 text-[13px] whitespace-nowrap">
                     <IconShield className="w-3.5 h-3.5" />
-                    敌人 {lv} 级甲
+                    敌人{lv}级甲
                   </span>
                 </th>
               ))}
