@@ -3,7 +3,7 @@
  * @description 全站顶部导航栏：三角形 LOGO、主导航（青绿辉光选中态）、移动端二级导航、全局搜索入口
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-24
+ * @updated 2026-11-25
  */
 'use client';
 
@@ -38,12 +38,12 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-edge bg-bg/85 backdrop-blur-md">
-      <div className="max-w-[1200px] mx-auto px-4 h-14 flex items-center gap-6">
-        {/* LOGO：青绿渐变三角（三角洲军徽意象）+ 站名 */}
-        <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+      <div className="max-w-[1200px] mx-auto px-3 sm:px-4 h-14 flex items-center gap-2.5 sm:gap-6">
+        {/* LOGO：青绿渐变三角（三角洲军徽意象）+ 站名（小屏压缩字号与字距，避免挤占操作区） */}
+        <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
           <svg
             viewBox="0 0 32 32"
-            className="w-7 h-7 transition-transform group-hover:scale-105"
+            className="w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105"
             style={{ filter: 'drop-shadow(0 0 12px var(--logo-glow))' }}
             aria-hidden="true"
           >
@@ -56,7 +56,7 @@ export default function Header() {
             <path d="M16 3 L30 28 H2 Z" fill="url(#logo-grad)" />
             <path d="M16 12 L23.5 25 H8.5 Z" fill="var(--bg)" />
           </svg>
-          <span className="font-bold tracking-[0.16em] text-[15px]">
+          <span className="font-bold tracking-[0.1em] sm:tracking-[0.16em] text-[14px] sm:text-[15px]">
             三角洲<span className="text-accent">军械库</span>
           </span>
         </Link>
@@ -78,19 +78,22 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <ThemeToggle />
           <SearchDialog />
         </div>
       </div>
 
-      {/* 移动端二级导航 */}
-      <nav className="md:hidden flex gap-1.5 px-4 pb-2 text-sm overflow-x-auto">
+      {/* 移动端二级导航：单行横向滚动，不折行占高 */}
+      <nav
+        aria-label="主导航（移动端）"
+        className="md:hidden flex gap-1.5 px-3 sm:px-4 pb-2 text-[13px] overflow-x-auto"
+      >
         {NAV.map((n) => (
           <Link
             key={n.href}
             href={n.href}
-            className={`px-3 py-1 rounded border whitespace-nowrap transition-colors ${
+            className={`px-2.5 sm:px-3 py-1 rounded border whitespace-nowrap transition-colors ${
               isActive(n.href) ? 'border-accent text-accent nav-glow' : 'border-edge text-muted'
             }`}
           >

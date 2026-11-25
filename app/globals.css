@@ -400,3 +400,46 @@ table.matrix-table th {
     scrollbar-color: var(--scroll-thumb) transparent;
   }
 }
+
+/* ============================================================
+ * 窄屏 / 移动端适配
+ * 1. 取消双击缩放的延迟与点击高亮，贴近原生手感
+ * 2. iOS 聚焦 <16px 字号会自动放大整页，统一抬高表单控件字号
+ * 3. 粘性头部在移动端为两行，锚点跳转需预留更高偏移
+ * ============================================================ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* 桌面头部单行 56px，预留 72px 避免锚点标题被遮住 */
+  scroll-padding-top: 72px;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a,
+button,
+select,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+@media (max-width: 767px) {
+  /* 移动端头部 = 主行 56px + 二级导航约 44px（滚动条另计） */
+  html {
+    scroll-padding-top: 104px;
+  }
+
+  /* 触控设备上表单控件字号 <16px 会触发 iOS 聚焦放大，统一抬到 16px */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* 底部抽屉 / 弹层内容区：文字不被 iPhone 底部横条压住 */
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}

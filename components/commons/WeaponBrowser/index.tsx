@@ -121,8 +121,8 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
 
   return (
     <div>
-      {/* 分类 Tab：胶囊按钮，选中青绿填充 */}
-      <div className="flex gap-1.5 flex-wrap mb-5">
+      {/* 分类 Tab：胶囊按钮，选中青绿填充（窄屏缩小内边距与字号，尽量少占高度） */}
+      <div className="flex gap-1.5 flex-wrap mb-4 sm:mb-5">
         {TABS.map((t) => {
           const active = tab === t.label;
           const count = t.label === '全部' ? weapons.length : weapons.filter((w) => w.category === t.label).length;
@@ -131,7 +131,7 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
             <button
               key={t.label}
               onClick={() => setTab(t.label)}
-              className={`flex items-center gap-1.5 whitespace-nowrap text-xs px-3.5 py-1.5 rounded-full border transition-colors ${
+              className={`flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs px-2.5 sm:px-3.5 py-1.5 rounded-full border transition-colors ${
                 active
                   ? 'bg-accent text-[color:var(--on-accent)] border-accent font-semibold [box-shadow:var(--tab-glow)]'
                   : 'border-edge bg-panel/60 text-muted hover:bg-accent hover:text-[color:var(--on-accent)] hover:border-accent hover:font-semibold hover:[box-shadow:var(--tab-glow)]'
@@ -147,7 +147,7 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
       </div>
 
       {/* 武器卡片网格 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-4 lg:grid-cols-3">
         {list.map((w) => {
           const hot = HOT_WEAPONS.has(w.name);
           return (
@@ -181,8 +181,8 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
                 <WeaponImage src={w.image} alt={w.name} compact={COMPACT_IMG_CATEGORIES.has(w.category)} />
               </div>
 
-              {/* 参数栏：8 项等宽平铺，标签在上数值在下（对齐参考图） */}
-              <div className="num grid grid-cols-8 gap-x-1 px-2.5 py-2 border-t border-edge/60">
+              {/* 参数栏：桌面 8 项一行，窄屏拆成 4 列 × 2 行，避免数字挤成一团 */}
+              <div className="num grid grid-cols-4 gap-x-1 gap-y-2 px-2.5 py-2 border-t border-edge/60 sm:grid-cols-8 sm:gap-y-0">
                 {CARD_STATS.map((s) => (
                   <div key={s.key} className="flex flex-col items-center gap-0.5 min-w-0">
                     <span className="text-[10px] text-muted whitespace-nowrap">{s.label}</span>

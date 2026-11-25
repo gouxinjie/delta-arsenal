@@ -76,12 +76,77 @@ const PEN_RULES: { label: string; rate: string; icon: string; tone: string }[] =
   { label: '低于甲级', rate: '0%', icon: '❌', tone: 'text-danger' },
 ];
 
+/** 弹药标识入参（只取展示所需字段，便于表格与卡片复用） */
+interface AmmoLabelProps {
+  /** 弹药基础信息 */
+  ammo: { name: string; caliber: string; rarity: string; tier: number | null; pen_level: number };
+  /** 品阶色（专属弹为危险色） */
+  color: string;
+  /** 是否专属弹（穿 6/7 或红品阶） */
+  exclusive: boolean;
+  /** 判定是否偏离常规四档 */
+  special: boolean;
+}
+
+/**
+ * 弹药标识块：名称 + 穿透 / 品阶 / 特殊徽章 + 口径行
+ * 桌面表格首列与移动端卡片共用，保证两套布局信息一致
+ * @param props - 弹药与配色信息
+ */
+function AmmoLabel({ ammo, color, exclusive, special }: AmmoLabelProps) {
+  const tierLabel = exclusive ? '专属弹' : `${ammo.tier ?? '?'} 阶（${ammo.rarity ?? '—'}）`;
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-medium">{ammo.name}</span>
+        <span
+          className="badge shrink-0"
+          style={{ color, borderColor: color, opacity: 0.9 }}
+          title={`穿透等级 ${ammo.pen_level} 级`}
+        >
+          穿{ammo.pen_level}
+        </span>
+        <span
+          className="badge shrink-0"
+          style={{ color, borderColor: color, opacity: 0.85 }}
+          title={`品阶：${tierLabel}`}
+        >
+          {exclusive ? '专属' : RARITY_LABEL[ammo.rarity] ?? `${ammo.tier}阶`}
+        </span>
+        {special && (
+          <span
+            className="badge shrink-0"
+            style={{ color: 'var(--warn)', borderColor: 'var(--warn)', opacity: 0.9 }}
+            title="穿透衰减不遵循常规四档（箭矢/龙息/双头弹/特效弹等），以单元格实测值为准"
+          >
+            特殊
+          </span>
+        )}
+      </div>
+      <p className="num text-xs text-muted mt-1 ml-0.5">
+        {ammo.caliber} · {ammo.rarity ?? '—'}
+      </p>
+    </>
+  );
+}
+
 export default function MatrixPage() {
   // 排序（第一版）：全局按穿透等级从高到低，同等级按口径字母序
   const sorted = getAllAmmo()
     .map((a) => ({ ...a, m: JSON.parse(a.matrix || '{}') as Record<string, MatrixCell> }))
     .filter((a) => Object.keys(a.m).length > 0)
     .sort((x, y) => y.pen_level - x.pen_level || x.caliber.localeCompare(y.caliber));
+
+  // 预先算好品阶色 / 专属标记 / 特殊机制，避免表格与移动端卡片各算一遍
+  const rows = sorted.map((a) => {
+    const isExclusive = a.pen_level >= 6 || a.rarity === '红';
+    return {
+      ...a,
+      isExclusive,
+      tierColor: isExclusive ? 'var(--danger)' : TIER_COLORS[(a.tier ?? 1) - 1],
+      special: isSpecialAmmo(a.m, a.pen_level),
+    };
+  });
 
   return (
     <div>
@@ -156,7 +221,42 @@ export default function MatrixPage() {
         </div>
       </div>
 
-      <div className="overflow-x-auto border border-edge rounded-lg [box-shadow:var(--panel-shadow)]">
+      {/* 移动端：每把弹一张卡，6 级护甲按 3×2 网格铺开，避免宽表横向拖动 */}
+      <ul className="space-y-2.5 md:hidden">
+        {rows.map((a) => (
+          <li
+            key={a.id}
+            className="tac-panel tac-panel-plain rounded-lg px-3 py-3"
+            style={{ boxShadow: `inset 3px 0 0 ${a.tierColor}` }}
+          >
+            <AmmoLabel ammo={a} color={a.tierColor} exclusive={a.isExclusive} special={a.special} />
+            <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+              {ARMOR_LEVELS.map((lv) => {
+                const j = judge(a.m[String(lv)]);
+                return (
+                  <div
+                    key={lv}
+                    className="rounded border border-edge/60 px-1.5 py-1.5 text-center"
+                    style={{ background: j.bg }}
+                    title={j.rate > 0 ? `身体伤害保留 ${j.rate}%` : '无法穿透，仅消耗护甲耐久'}
+                  >
+                    <p className="num flex items-center justify-center gap-1 text-[10px] text-muted">
+                      <IconShield className="h-3 w-3" />
+                      {lv}级甲
+                    </p>
+                    <p className="num mt-1 text-[13px] font-semibold" style={{ color: j.fg }}>
+                      {j.icon} {j.rate}%
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* 桌面 / 平板：横向矩阵表（首列吸附，长列表滚动时保留弹种名） */}
+      <div className="hidden md:block overflow-x-auto border border-edge rounded-lg [box-shadow:var(--panel-shadow)]">
         <table className="matrix-table w-full text-sm min-w-[780px]">
           <thead>
             <tr className="bg-panel">
@@ -174,68 +274,30 @@ export default function MatrixPage() {
             </tr>
           </thead>
           <tbody>
-            {sorted.map((a) => {
-              // 品阶色（白绿蓝紫金）；穿 6/7 或「红」品阶为专属弹，用红色标识
-              const isExclusive = a.pen_level >= 6 || a.rarity === '红';
-              const tierColor = isExclusive ? 'var(--danger)' : TIER_COLORS[(a.tier ?? 1) - 1];
-              const tierLabel = isExclusive ? '专属弹' : `${a.tier ?? '?'} 阶（${a.rarity ?? '—'}）`;
-              // 穿透衰减偏离常规四档的弹药（箭矢/龙息/双头弹/特效弹等），单独标注
-              const special = isSpecialAmmo(a.m, a.pen_level);
-              return (
-                <tr key={a.id} className="border-t border-edge hover:bg-panel/60">
-                  <td
-                    className="sticky left-0 bg-bg z-10 px-3 py-2.5"
-                    style={{ boxShadow: `inset 3px 0 0 ${tierColor}` }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{a.name}</span>
-                      {/* 穿透等级徽章 */}
-                      <span
-                        className="badge shrink-0"
-                        style={{ color: tierColor, borderColor: tierColor, opacity: 0.9 }}
-                        title={`穿透等级 ${a.pen_level} 级`}
-                      >
-                        穿{a.pen_level}
-                      </span>
-                      {/* 品阶文字徽章 */}
-                      <span
-                        className="badge shrink-0"
-                        style={{ color: tierColor, borderColor: tierColor, opacity: 0.85 }}
-                        title={`品阶：${tierLabel}`}
-                      >
-                        {isExclusive ? '专属' : RARITY_LABEL[a.rarity] ?? `${a.tier}阶`}
-                      </span>
-                      {special && (
-                        <span
-                          className="badge shrink-0"
-                          style={{ color: 'var(--warn)', borderColor: 'var(--warn)', opacity: 0.9 }}
-                          title="穿透衰减不遵循常规四档（箭矢/龙息/双头弹/特效弹等），以单元格实测值为准"
-                        >
-                          特殊
-                        </span>
-                      )}
-                    </div>
-                    <p className="num text-xs text-muted mt-1 ml-0.5">
-                      {a.caliber} · {a.rarity ?? '—'}
-                    </p>
-                  </td>
-                  {ARMOR_LEVELS.map((lv) => {
-                    const j = judge(a.m[String(lv)]);
-                    return (
-                      <td
-                        key={lv}
-                        className="num text-center px-2 py-2"
-                        style={{ background: j.bg, color: j.fg }}
-                        title={j.rate > 0 ? `身体伤害保留 ${j.rate}%` : '无法穿透，仅消耗护甲耐久'}
-                      >
-                        {j.icon}
-                        <span className="text-[10px] opacity-70 ml-0.5">{j.rate}%</span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
+            {rows.map((a) => (
+              <tr key={a.id} className="border-t border-edge hover:bg-panel/60">
+                <td
+                  className="sticky left-0 bg-bg z-10 px-3 py-2.5"
+                  style={{ boxShadow: `inset 3px 0 0 ${a.tierColor}` }}
+                >
+                  <AmmoLabel ammo={a} color={a.tierColor} exclusive={a.isExclusive} special={a.special} />
+                </td>
+                {ARMOR_LEVELS.map((lv) => {
+                  const j = judge(a.m[String(lv)]);
+                  return (
+                    <td
+                      key={lv}
+                      className="num text-center px-2 py-2"
+                      style={{ background: j.bg, color: j.fg }}
+                      title={j.rate > 0 ? `身体伤害保留 ${j.rate}%` : '无法穿透，仅消耗护甲耐久'}
+                    >
+                      {j.icon}
+                      <span className="text-[10px] opacity-70 ml-0.5">{j.rate}%</span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

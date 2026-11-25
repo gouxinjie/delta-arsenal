@@ -1,8 +1,18 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Header from '@/components/commons/Header';
 import Footer from '@/components/commons/Footer';
 import { getMeta } from '@/lib/db';
+
+/**
+ * 视口配置：固定按设备宽度渲染，viewportFit=cover 让固定在底部的抽屉 / 弹层
+ * 可以配合 env(safe-area-inset-*) 避开 iPhone 刘海与底部横条
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: {

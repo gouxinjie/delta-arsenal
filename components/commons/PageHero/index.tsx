@@ -41,8 +41,8 @@ export default function PageHero({ title, subtitle, icon }: PageHeroProps) {
       />
 
       {/* 内容（与页面主容器对齐） */}
-      <div className="relative mx-auto flex max-w-[1200px] items-center gap-3.5 px-4 py-6 sm:gap-5 sm:py-8">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-accent/50 bg-gradient-to-br from-accent/30 to-accent/5 text-accent [box-shadow:var(--box-glow)] sm:h-14 sm:w-14">
+      <div className="relative mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-5 sm:gap-5 sm:py-8">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-accent/50 bg-gradient-to-br from-accent/30 to-accent/5 text-accent [box-shadow:var(--box-glow)] sm:h-14 sm:w-14">
           {icon}
         </span>
         <div className="min-w-0">

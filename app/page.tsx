@@ -138,7 +138,7 @@ function DataSourcePanel({ sources }: { sources: SourceInfo[] }) {
   return (
     <section
       id="data-source"
-      className="tac-panel tac-panel-plain mt-4 scroll-mt-20 rounded-xl p-6"
+      className="tac-panel tac-panel-plain mt-4 rounded-xl p-4 sm:p-6"
       aria-labelledby="data-source-title"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -380,13 +380,13 @@ export default function Home() {
         <div className="absolute inset-0" style={{ background: 'var(--hero-sweep)' }} aria-hidden="true" />
         <HeroRadar />
 
-        <div className="relative mx-auto max-w-[1200px] px-4 py-12 sm:py-14">
+        <div className="relative mx-auto max-w-[1200px] px-4 py-10 sm:py-14">
           <p className="num flex items-center gap-2.5 text-[11px] tracking-[0.32em] text-accent">
             <span className="h-px w-8 bg-accent/60" aria-hidden="true" />
             DELTA ARSENAL // {season} 数据集
           </p>
 
-          <h1 className="mt-5 text-[34px] font-bold leading-[1.15] tracking-[0.14em] title-glow sm:text-5xl">
+          <h1 className="mt-4 text-[30px] font-bold leading-[1.15] tracking-[0.1em] title-glow sm:mt-5 sm:text-5xl sm:tracking-[0.14em]">
             三角洲<span className="text-accent">军械库</span>
           </h1>
 
@@ -416,23 +416,25 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* 数据速览：等宽数字 + 细分隔线 */}
-          <dl className="mt-8 flex flex-wrap items-end gap-x-10 gap-y-5">
-            <div className="border-l border-accent/30 pl-3.5">
-              <dt className="num text-[10px] tracking-[0.3em] text-muted">弹药 AMMO</dt>
+          {/* 数据速览：等宽数字 + 细分隔线；窄屏两列摆放，避免长版本号溢出 */}
+          <dl className="mt-8 grid grid-cols-2 gap-x-5 gap-y-5 sm:flex sm:flex-wrap sm:items-end sm:gap-x-10">
+            <div className="border-l border-accent/30 pl-3">
+              <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">弹药 AMMO</dt>
               <dd className="num mt-1 text-2xl font-bold leading-none text-accent">{counts.ammo}</dd>
             </div>
-            <div className="border-l border-info/30 pl-3.5">
-              <dt className="num text-[10px] tracking-[0.3em] text-muted">枪械 ARMS</dt>
+            <div className="border-l border-info/30 pl-3">
+              <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">枪械 ARMS</dt>
               <dd className="num mt-1 text-2xl font-bold leading-none text-info">{counts.weapons}</dd>
             </div>
-            <div className="border-l border-edge pl-3.5">
-              <dt className="num text-[10px] tracking-[0.3em] text-muted">数据更新</dt>
+            <div className="border-l border-edge pl-3">
+              <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">数据更新</dt>
               <dd className="num mt-1 text-xl font-bold leading-none text-main">{updated}</dd>
             </div>
-            <div className="border-l border-edge pl-3.5">
-              <dt className="num text-[10px] tracking-[0.3em] text-muted">数据集 DATASET</dt>
-              <dd className="num mt-1 text-base font-bold leading-none text-main">{datasetVersion || '—'}</dd>
+            <div className="border-l border-edge pl-3">
+              <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">数据集 DATASET</dt>
+              <dd className="num mt-1 truncate text-base font-bold leading-none text-main" title={datasetVersion || '—'}>
+                {datasetVersion || '—'}
+              </dd>
             </div>
           </dl>
 
@@ -461,12 +463,12 @@ export default function Home() {
           <span className="num text-[10px] tracking-[0.2em] text-muted/50">4 MODULES</span>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {cards.map((c, i) => (
             <Link
               key={c.href}
               href={c.href}
-              className={`tac-panel tac-panel-plain group relative flex flex-col overflow-hidden rounded-xl p-5 ${c.span} ${
+              className={`tac-panel tac-panel-plain group relative flex flex-col overflow-hidden rounded-xl p-4 sm:p-5 ${c.span} ${
                 c.soon ? 'opacity-70 hover:border-edge' : 'tac-hover-flat'
               }`}
             >

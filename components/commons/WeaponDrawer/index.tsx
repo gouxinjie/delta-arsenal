@@ -205,15 +205,15 @@ export default function WeaponDrawer({ weapon: incomingWeapon, statMax, onClose 
           transform: open ? 'translateX(0)' : 'translateX(100%)',
           transition: `transform ${DRAWER_ANIM_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`,
         }}
-        className={`absolute right-0 top-0 h-full w-full sm:max-w-[560px] bg-panel border-l border-edge [box-shadow:var(--drawer-shadow)] flex flex-col ${
+        className={`absolute right-0 top-0 h-dvh w-full max-w-full bg-panel border-l border-edge [box-shadow:var(--drawer-shadow)] flex flex-col sm:max-w-[560px] ${
           open ? '' : 'pointer-events-none'
         }`}
       >
         {/* 头部：缩略图 + 名称 + 类别/口径标签 + 数据速览 + 关闭按钮 */}
-        <header className="relative shrink-0 px-5 pt-5 pb-4 border-b border-edge bg-gradient-to-b from-panel-hi/60 to-transparent">
-          <div className="flex items-start gap-3.5">
-            {/* 缩略图：径向底纹 + 图片投影，与卡片图区保持同一视觉语言 */}
-            <div className="thumb-bg w-24 h-16 sm:w-28 sm:h-[68px] shrink-0 flex items-center justify-center bg-bg border border-edge/70 rounded px-2">
+        <header className="relative shrink-0 px-4 pt-4 pb-3.5 border-b border-edge bg-gradient-to-b from-panel-hi/60 to-transparent sm:px-5 sm:pt-5 sm:pb-4">
+          <div className="flex items-start gap-3">
+            {/* 缩略图：径向底纹 + 图片投影，与卡片图区保持同一视觉语言（窄屏缩一号，给文字让位） */}
+            <div className="thumb-bg w-20 h-14 sm:w-28 sm:h-[68px] shrink-0 flex items-center justify-center bg-bg border border-edge/70 rounded px-1.5 sm:px-2">
               {weapon.image ? (
                 <img
                   src={weapon.image}
@@ -227,7 +227,7 @@ export default function WeaponDrawer({ weapon: incomingWeapon, statMax, onClose 
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-bold truncate leading-tight">{weapon.name}</h2>
+              <h2 className="text-base sm:text-lg font-bold truncate leading-tight">{weapon.name}</h2>
               {/* 类别用中性描边标签、口径用强调色标签：与图鉴卡片的高亮口径呼应 */}
               <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                 <span className="text-[11px] px-1.5 py-px rounded border border-edge/70 bg-bg/60 text-muted">
@@ -257,8 +257,8 @@ export default function WeaponDrawer({ weapon: incomingWeapon, statMax, onClose 
           </div>
         </header>
 
-        {/* 内容区：可滚动 */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        {/* 内容区：可滚动，底部预留 iPhone 横条安全区 */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-5 sm:px-5">
           {/* 可用子弹 */}
           <section>
             <SectionTitle title="可用子弹" count={weapon.ammo.length} />

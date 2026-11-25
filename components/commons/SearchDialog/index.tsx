@@ -72,14 +72,15 @@ export default function SearchDialog() {
 
   return (
     <>
-      {/* 搜索入口：图标 + 提示文案 + 快捷键键帽 */}
+      {/* 搜索入口：图标 + 提示文案 + 快捷键键帽（窄屏只留图标，避免挤压 LOGO 与主题按钮） */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 text-xs text-muted border border-edge rounded-md px-3 py-1.5 bg-bg/60 hover:border-accent/60 hover:text-main transition-colors"
+        aria-label="搜索武器或弹药"
+        className="flex h-8 items-center gap-2 text-xs text-muted border border-edge rounded-md px-2 sm:px-3 bg-bg/60 hover:border-accent/60 hover:text-main transition-colors"
       >
         <IconSearch className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">搜索武器 / 弹药…</span>
-        <kbd className="key-chip hidden sm:inline">Ctrl + K</kbd>
+        <kbd className="key-chip hidden md:inline">Ctrl + K</kbd>
       </button>
 
       {/* 弹窗通过 Portal 挂到 body：Header 的 backdrop-blur 会成为 fixed 后代的包含块，
@@ -87,7 +88,7 @@ export default function SearchDialog() {
           open 只由点击事件置为 true，SSR 阶段不会访问 document，额外加保护更稳妥 */}
       {open && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-[color:var(--overlay)] anim-fade flex items-start justify-center pt-24 px-4"
+          className="fixed inset-0 z-50 bg-[color:var(--overlay)] anim-fade flex items-start justify-center px-3 pt-[12vh] sm:px-4 sm:pt-24"
           onClick={() => setOpen(false)}
         >
           <div
@@ -108,12 +109,13 @@ export default function SearchDialog() {
                 }}
               />
             </div>
-            <ul className="mt-2 max-h-80 overflow-y-auto">
+            {/* 窄屏限制结果区高度，避免软键盘弹出后可视线范围被撑出屏幕 */}
+            <ul className="mt-2 max-h-[50dvh] overflow-y-auto sm:max-h-80">
               {results.map((r) => (
                 <li key={r.type + r.id}>
                   <button
                     onClick={() => go(r)}
-                    className="w-full text-left px-3 py-2 hover:bg-bg rounded flex items-center gap-3 text-sm"
+                    className="w-full text-left px-3 py-2.5 sm:py-2 hover:bg-bg rounded flex items-center gap-3 text-sm"
                   >
                     <span
                       className={`text-[10px] px-1.5 py-0.5 border border-edge rounded ${
@@ -122,8 +124,8 @@ export default function SearchDialog() {
                     >
                       {r.type === 'weapon' ? '武器' : '弹药'}
                     </span>
-                    <span>{r.name}</span>
-                    <span className="num text-xs text-muted ml-auto">{r.caliber}</span>
+                    <span className="min-w-0 truncate">{r.name}</span>
+                    <span className="num text-xs text-muted ml-auto shrink-0">{r.caliber}</span>
                   </button>
                 </li>
               ))}

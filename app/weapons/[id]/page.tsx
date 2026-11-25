@@ -42,7 +42,7 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
       <div className="flex flex-col md:flex-row gap-6">
         <div className="tac-panel md:w-2/5 p-4 flex items-center justify-center">
           {w.image ? (
-            <img src={w.image} alt={w.name} className="max-h-64 object-contain" />
+            <img src={w.image} alt={w.name} className="max-h-48 w-full object-contain sm:max-h-64" />
           ) : (
             <span className="text-muted/30" aria-hidden="true">
               <IconRifle className="w-24 h-24" />
@@ -54,7 +54,7 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
           <p className="num text-sm text-muted mt-1">
             {w.category} · {w.caliber || '—'}
           </p>
-          <div className="grid grid-cols-2 gap-x-6 mt-4">
+          <div className="mt-4 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
             {panelItems
               .filter(([, v]) => v !== null && v !== undefined && v !== '')
               .map(([k, v]) => (
@@ -81,7 +81,7 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
                 <Link
                   key={a.id}
                   href={`/ammo?q=${encodeURIComponent(a.name)}`}
-                  className={`tac-panel !border-l-2 ${a.tier ? TIER_BORDER[a.tier - 1] : 'border-l-edge'} px-4 py-2 flex items-center gap-3 text-sm hover:border-accent transition-colors`}
+                  className={`tac-panel !border-l-2 ${a.tier ? TIER_BORDER[a.tier - 1] : 'border-l-edge'} px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm hover:border-accent transition-colors`}
                 >
                   <span>{a.name}</span>
                   {effects.map((e) => (
@@ -122,7 +122,7 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
       {related.length > 0 && (
         <section>
           <h2 className="font-bold mb-2">同类武器</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {related.map((r) => (
               <Link key={r.id} href={`/weapons/${r.id}`} className="tac-panel p-3 hover:border-accent transition-colors">
                 <p className="text-sm truncate">{r.name}</p>
