@@ -334,8 +334,16 @@ async function main() {
 
   const ammoWeapons = [];
   const linked = new Set();
-  /** 写入一条关联（去重：官方关联与口径补齐会重叠） */
+  // 关联有效性校验：官方名单可能引用弹药源尚未收录的新弹种（如霰弹 37250400005），
+  // 这类「幽灵 id」写入会形成孤儿关联（前端 join 不到、meta 计数虚高），此处直接丢弃并告警
+  const weaponIdSet = new Set(weapons.map((w) => w.id));
+  const droppedLinks = [];
+  /** 写入一条关联（去重：官方关联与口径补齐会重叠；无效 id 丢弃） */
   const pushLink = (ammoId, weaponId) => {
+    if (!ammoById.has(ammoId) || !weaponIdSet.has(weaponId)) {
+      droppedLinks.push({ ammoId, weaponId });
+      return;
+    }
     const key = `${ammoId}|${weaponId}`;
     if (linked.has(key)) return;
     linked.add(key);
@@ -356,6 +364,11 @@ async function main() {
     for (const ammoId of ammoIdsByCaliber.get(w.caliber) ?? []) {
       pushLink(ammoId, w.id);
     }
+  }
+
+  if (droppedLinks.length) {
+    const detail = droppedLinks.map((d) => `${d.ammoId}->${d.weaponId}`).join(', ');
+    console.warn(`  [WARN] 丢弃 ${droppedLinks.length} 条无效弹药关联（弹药源未收录或武器不存在）: ${detail}`);
   }
 
   // ---- 4. 阈值校验（PRD 9：低于阈值终止不写入）----
