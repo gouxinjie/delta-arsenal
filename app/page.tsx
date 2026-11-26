@@ -439,19 +439,19 @@ export default function Home() {
           {/* 数据速览：等宽数字 + 细分隔线；窄屏两列摆放，避免长版本号溢出 */}
           <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 sm:mt-8 sm:flex sm:flex-wrap sm:items-end sm:gap-x-10 sm:gap-y-5">
             <div className="border-l border-accent/30 pl-3">
-              <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">弹药 AMMO</dt>
+              <dt className="num text-[11px] tracking-[0.2em] text-main/80 sm:tracking-[0.3em]">弹药 AMMO</dt>
               <dd className="num mt-1 text-2xl font-bold leading-none text-accent">{formatCount(counts.ammo)}</dd>
             </div>
             <div className="border-l border-info/30 pl-3">
-              <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">枪械 ARMS</dt>
+              <dt className="num text-[11px] tracking-[0.2em] text-main/80 sm:tracking-[0.3em]">枪械 ARMS</dt>
               <dd className="num mt-1 text-2xl font-bold leading-none text-info">{formatCount(counts.weapons)}</dd>
             </div>
             <div className="border-l border-edge pl-3">
-              <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">数据更新</dt>
+              <dt className="num text-[11px] tracking-[0.2em] text-main/80 sm:tracking-[0.3em]">数据更新</dt>
               <dd className="num mt-1 text-xl font-bold leading-none text-main">{updatedAt}</dd>
             </div>
             <div className="border-l border-edge pl-3">
-              <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">数据集 DATASET</dt>
+              <dt className="num text-[11px] tracking-[0.2em] text-main/80 sm:tracking-[0.3em]">数据集 DATASET</dt>
               <dd className="num mt-1 truncate text-base font-bold leading-none text-main" title={datasetVersion || '—'}>
                 {datasetVersion || '—'}
               </dd>
