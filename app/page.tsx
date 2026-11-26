@@ -234,7 +234,8 @@ function DataSourcePanel({ sources }: { sources: SourceInfo[] }) {
 
 /**
  * Hero 右侧雷达装饰环（纯 SVG，装饰性质，屏幕阅读器忽略）
- * @returns 同心环 + 刻度 + 三角洲三角意象
+ * 动画层次：外圈刻度自转 / 内圈虚线反向缓转 / 扫描扇形（最明显的动效）/ 中心三角呼吸
+ * @returns 同心环 + 刻度 + 扫描扇面 + 三角洲三角意象
  */
 function HeroRadar() {
   return (
@@ -243,9 +244,11 @@ function HeroRadar() {
       aria-hidden="true"
     >
       <div className="relative h-[460px] w-[460px]">
-        {/* 环心柔光 */}
-        <div className="absolute inset-24 rounded-full bg-accent/[0.07] blur-3xl" />
-        <svg viewBox="0 0 460 460" className="absolute inset-0 h-full w-full text-accent/25">
+        {/* 环心柔光：与中心三角同步呼吸 */}
+        <div className="radar-glow absolute inset-24 rounded-full bg-accent/[0.09] blur-3xl" />
+        {/* 扫描扇面：直径 408 与外圈刻度圆对齐（(460 - 408) / 2 = 26） */}
+        <div className="radar-sweep absolute inset-[26px] rounded-full" />
+        <svg viewBox="0 0 460 460" className="absolute inset-0 h-full w-full text-accent/35">
           <circle cx="230" cy="230" r="150" fill="none" stroke="currentColor" strokeWidth="1" />
           <circle
             cx="230"
@@ -266,20 +269,23 @@ function HeroRadar() {
               stroke="currentColor"
               strokeWidth="7"
               strokeDasharray="2 48"
-              strokeOpacity="0.45"
+              strokeOpacity="0.55"
             />
           </g>
-          {/* 内圈虚线 + 十字准线 */}
-          <circle
-            cx="230"
-            cy="230"
-            r="94"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1"
-            strokeDasharray="1 13"
-            strokeOpacity="0.7"
-          />
+          {/* 内圈虚线：与刻度反向旋转，形成对转层次 */}
+          <g className="radar-spin-rev">
+            <circle
+              cx="230"
+              cy="230"
+              r="94"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1"
+              strokeDasharray="1 13"
+              strokeOpacity="0.7"
+            />
+          </g>
+          {/* 十字准线 */}
           <path
             d="M230 18v42M230 400v42M18 230h42M400 230h42"
             stroke="currentColor"
@@ -287,14 +293,13 @@ function HeroRadar() {
             strokeOpacity="0.55"
           />
         </svg>
-        {/* 中心三角洲三角 */}
-        <svg
-          viewBox="0 0 32 32"
-          className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 text-accent/35"
-        >
-          <path d="M16 3 30 28H2Z" fill="none" stroke="currentColor" strokeWidth="1.2" />
-          <path d="M16 12 23.5 25H8.5Z" fill="none" stroke="currentColor" strokeWidth="1" />
-        </svg>
+        {/* 中心三角洲三角：定位与呼吸动画分层，避免 transform 互相覆盖 */}
+        <div className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2">
+          <svg viewBox="0 0 32 32" className="radar-core h-full w-full text-accent/45">
+            <path d="M16 3 30 28H2Z" fill="none" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M16 12 23.5 25H8.5Z" fill="none" stroke="currentColor" strokeWidth="1" />
+          </svg>
+        </div>
       </div>
     </div>
   );
@@ -453,7 +458,7 @@ export default function Home() {
             </div>
           </dl>
 
-          <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] tracking-wider text-muted/50 sm:mt-7">
+          <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tracking-wider text-muted/60 sm:mt-7 sm:text-[13px]">
             <span>非官方粉丝站点 · 数据仅供参考，以游戏内实测为准</span>
             <a
               href="#data-source"
@@ -473,9 +478,24 @@ export default function Home() {
 
       {/* ============ 模块入口：Bento 网格（移动端 2 列紧凑排布，核心/二期卡占整行） ============ */}
       <section className="space-y-3 sm:space-y-4">
-        <div className="flex items-end justify-between">
-          <h2 className="text-[13px] font-bold tracking-[0.2em] text-muted">核心模块</h2>
-          <span className="num text-[10px] tracking-[0.2em] text-muted/50">{cards.length} MODULES</span>
+        {/* 区块标题：强调色标 + 标题 + 渐变细线 + 数量，细线用于收拢标题行的横向留白 */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <h2 className="flex shrink-0 items-center gap-2 text-sm font-bold tracking-[0.18em] text-muted sm:text-[15px]">
+              <span className="h-3.5 w-[3px] rounded-sm bg-accent sm:h-4" aria-hidden="true" />
+              核心模块
+            </h2>
+            <span
+              className="h-px flex-1 bg-gradient-to-r from-edge via-edge/60 to-transparent"
+              aria-hidden="true"
+            />
+            <span className="num shrink-0 text-[10px] tracking-[0.2em] text-muted/50">
+              {cards.length} MODULES
+            </span>
+          </div>
+          <p className="text-[12px] leading-relaxed text-muted/60 sm:text-[13px]">
+            穿甲矩阵、弹药库、武器图鉴已上线，改枪码二期开放；数据构建期入库，点开即查。
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
@@ -551,7 +571,7 @@ export default function Home() {
               </p>
 
               <span
-                className={`relative mt-auto items-center gap-1.5 pt-3 text-[11px] tracking-[0.18em] sm:pt-5 ${
+                className={`relative mt-auto items-center gap-1.5 pt-3 text-xs tracking-[0.16em] sm:pt-5 sm:text-[13px] ${
                   c.soon ? 'hidden sm:flex num text-muted/60' : 'flex num text-muted group-hover:text-accent'
                 }`}
               >

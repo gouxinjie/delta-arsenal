@@ -58,6 +58,10 @@
   --hero-bg: linear-gradient(90deg, #0a0f15 30%, rgba(13, 34, 29, 0.92) 62%, rgba(15, 52, 43, 0.92) 100%);
   --hero-sweep: linear-gradient(105deg, transparent 42%, rgba(47, 227, 164, 0.07) 54%, transparent 66%);
 
+  /* Hero 雷达扫描扇形（暗色主题更亮，浅色主题需压暗避免白底发脏） */
+  --radar-beam: rgba(47, 227, 164, 0.5);
+  --radar-beam-soft: rgba(47, 227, 164, 0.14);
+
   /* 图片 / 缩略图 */
   --img-shadow: rgba(47, 227, 164, 0.1);
   --img-shadow-hi: rgba(47, 227, 164, 0.2);
@@ -126,6 +130,10 @@
   --ambient-2: rgba(29, 78, 216, 0.03);
   --hero-bg: linear-gradient(90deg, #ffffff 30%, #f2faf7 62%, #e8f5f0 100%);
   --hero-sweep: linear-gradient(105deg, transparent 42%, rgba(15, 118, 110, 0.05) 54%, transparent 66%);
+
+  /* 浅色主题扫描扇形：低透明度墨绿，避免白底出现明显脏污 */
+  --radar-beam: rgba(15, 118, 110, 0.26);
+  --radar-beam-soft: rgba(15, 118, 110, 0.08);
 
   --img-shadow: rgba(16, 24, 40, 0.12);
   --img-shadow-hi: rgba(16, 24, 40, 0.2);
@@ -216,18 +224,65 @@ body::before {
 .anim-slide { animation: slideInRight 0.28s cubic-bezier(0.22, 0.61, 0.36, 1); }
 
 /* ---------- 首页 Hero 雷达装饰环 ---------- */
-/* 外圈刻度缓慢自转，纯装饰；系统开启「减弱动效」时停止 */
+/* 外圈刻度自转（22s 一圈，肉眼可辨）+ 内圈虚线反向缓转，构成对转的层次感 */
 @keyframes radarSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+@keyframes radarSpinReverse {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+/* 扫描扇形透明度呼吸，让扫过的节奏更明显 */
+@keyframes radarSweepPulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+/* 中心三角与环心柔光同步呼吸 */
+@keyframes radarCorePulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+@keyframes radarGlowPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+
 .radar-spin {
   transform-box: view-box;
   transform-origin: 230px 230px;
-  animation: radarSpin 48s linear infinite;
+  animation: radarSpin 22s linear infinite;
 }
+.radar-spin-rev {
+  transform-box: view-box;
+  transform-origin: 230px 230px;
+  animation: radarSpinReverse 40s linear infinite;
+}
+/* 扫描扇形：conic 渐变从 0deg 起一条亮边 + 向后 68deg 渐隐的扇面 */
+.radar-sweep {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--radar-beam) 1.5deg,
+    var(--radar-beam-soft) 4deg,
+    transparent 68deg
+  );
+  /* 中心与外缘淡出，视觉上像贴着环带扫过，而不是一块硬边扇形 */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 15%, black 36%, black 93%, transparent 100%);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 15%, black 36%, black 93%, transparent 100%);
+  animation: radarSpin 7s linear infinite, radarSweepPulse 7s ease-in-out infinite;
+}
+.radar-core { animation: radarCorePulse 3.4s ease-in-out infinite; }
+.radar-glow { animation: radarGlowPulse 3.4s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
-  .radar-spin { animation: none; }
+  .radar-spin,
+  .radar-spin-rev,
+  .radar-sweep,
+  .radar-core,
+  .radar-glow {
+    animation: none;
+  }
 }
 
 /* ---------- 战术面板 ---------- */
