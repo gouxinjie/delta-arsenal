@@ -204,12 +204,49 @@ body::before {
 }
 
 /* ---------- 路由切换动效 ---------- */
+/* 只做透明度过渡：整页 translateY 会把上千节点的容器提升为合成层，
+   切换时既有额外重绘开销、又让用户多等一段位移时间，直接去掉。 */
 @keyframes routeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .route-anim {
-  animation: routeIn 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: routeIn 0.16s ease-out;
+}
+
+/* ---------- 路由加载骨架（app/loading.tsx） ---------- */
+/* 不确定进度条：单条高光从左向右循环扫过，示意请求已发出 */
+@keyframes routeBarSweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}
+.route-bar::after {
+  content: "";
+  display: block;
+  width: 25%;
+  height: 100%;
+  background: var(--accent);
+  box-shadow: var(--bar-glow);
+  animation: routeBarSweep 1s ease-in-out infinite;
+}
+/* 骨架块：面板色与边框色之间做微光扫过，比纯灰块更快让人理解「正在加载」 */
+@keyframes skShimmer {
+  from { background-position: 140% 0; }
+  to { background-position: -40% 0; }
+}
+.sk {
+  border-radius: 6px;
+  background-image: linear-gradient(90deg, var(--panel-hi) 20%, var(--border) 45%, var(--panel-hi) 70%);
+  background-size: 220% 100%;
+  animation: skShimmer 1.3s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-anim,
+  .route-bar::after,
+  .sk {
+    animation: none;
+  }
 }
 
 @keyframes fadeIn {

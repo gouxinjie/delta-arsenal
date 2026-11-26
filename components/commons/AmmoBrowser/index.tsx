@@ -22,6 +22,7 @@ import {
 } from '@/constants/game';
 import { describeAmmoEffects } from '@/lib/ammo-effects';
 import { formatPercent } from '@/lib/format';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type { AmmoEffects, AmmoView } from '@/types/ammo';
 
 /**
@@ -154,6 +155,16 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
   const [picked, setPicked] = useState<AmmoView | null>(null);
   /** 已关闭过的 URL 参数指纹：避免用户关掉抽屉后被同一组参数重新顶开 */
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+
+  /**
+   * 当前视口是否达到桌面断点（与 Tailwind 的 md 断点 768px 对齐）
+   * 移动端列表与桌面表格此前是两套 DOM 全量输出、只靠 CSS 隐藏其一，
+   * 118 条弹药意味着每次进入弹药库要多创建约三千个节点；判定出视口后只保留命中的那套。
+   * null 表示服务端 / 水合首帧尚不可知，此时两套都渲染，保证与服务端 HTML 一致。
+   */
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const showMobileList = isDesktop !== true;
+  const showDesktopTable = isDesktop !== false;
 
   /** 搜索弹窗 / 武器详情传入的弹药 id（精确命中） */
   const ammoParam = sp.get('ammo');
@@ -313,6 +324,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
             </h2>
 
             {/* 移动端条目：口径已由组标题承载，条目只留「名称 / 品阶 / 穿透 / 双伤害 / 枪械数」 */}
+            {showMobileList && (
             <ul className="md:hidden">
               {list.map((a) => {
                 const effects = describeAmmoEffects(a.effects);
@@ -378,8 +390,10 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
                 );
               })}
             </ul>
+            )}
 
             {/* 桌面 / 平板：完整宽表（行点击仅为鼠标便利，键盘走首列按钮，保留表格语义） */}
+            {showDesktopTable && (
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm min-w-[900px]">
                 <thead>
@@ -460,6 +474,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
                 </tbody>
               </table>
             </div>
+            )}
           </section>
         ))}
         {!filtered.length && <p className="text-muted text-sm py-10 text-center">没有符合条件的弹药</p>}

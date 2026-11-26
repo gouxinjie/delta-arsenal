@@ -40,7 +40,7 @@ export default function Header() {
     <header className="sticky top-0 z-40 border-b border-edge bg-bg/85 backdrop-blur-md">
       <div className="max-w-[1200px] mx-auto px-3 sm:px-4 h-14 flex items-center gap-2.5 sm:gap-6">
         {/* LOGO：青绿渐变三角（三角洲军徽意象）+ 站名（小屏压缩字号与字距，避免挤占操作区） */}
-        <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
+        <Link href="/" prefetch className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
           <svg
             viewBox="0 0 32 32"
             className="w-6 h-6 sm:w-7 sm:h-7 transition-transform group-hover:scale-105"
@@ -66,6 +66,9 @@ export default function Header() {
             <Link
               key={n.href}
               href={n.href}
+              // prefetch：四个模块均为静态页，RSC 负载仅数十 KB；
+              // 显式完整预取后点击即可命中客户端缓存，切换不再等待网络往返
+              prefetch
               className={`relative px-3 py-1.5 rounded transition-colors ${
                 isActive(n.href) ? 'text-accent nav-glow' : 'text-muted hover:text-main'
               }`}
@@ -93,6 +96,7 @@ export default function Header() {
           <Link
             key={n.href}
             href={n.href}
+            prefetch
             className={`px-2.5 sm:px-3 py-1 rounded border whitespace-nowrap transition-colors ${
               isActive(n.href) ? 'border-accent text-accent nav-glow' : 'border-edge text-muted'
             }`}

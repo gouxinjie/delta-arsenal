@@ -45,6 +45,8 @@ export default function SmartImage({
       src={src}
       alt={alt}
       loading={lazy ? 'lazy' : undefined}
+      // 异步解码：切换模块时几十张武器图同时入场，同步解码会长时间占住主线程造成卡顿
+      decoding="async"
       className={className}
       onError={() => setFailedSrc(src)}
     />
