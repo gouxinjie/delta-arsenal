@@ -22,8 +22,9 @@ import {
 } from '@/components/commons/icons';
 import SmartImage from '@/components/commons/SmartImage';
 import WeaponDrawer from '@/components/commons/WeaponDrawer';
-import { WEAPON_BAR_STAT_KEYS, WEAPON_CARD_STAT_KEYS, WEAPON_STAT_META } from '@/constants/weapon';
-import type { WeaponDetail, WeaponNumericKey } from '@/types/weapon';
+import { WEAPON_CARD_STAT_KEYS, WEAPON_STAT_META } from '@/constants/weapon';
+import { computeStatMax } from '@/lib/view';
+import type { WeaponDetail } from '@/types/weapon';
 
 /** 图片偏小的分类：短枪身高宽比接近方形，在宽幅图区里会被撑满高度显得过大，单独缩放 */
 const COMPACT_IMG_CATEGORIES = new Set(['手枪']);
@@ -61,17 +62,8 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
     [weapons, tab]
   );
 
-  /** 抽屉进度条用到的字段在全库中的最大值（只统计进度条实际展示的字段） */
-  const statMax = useMemo(() => {
-    const max: Partial<Record<WeaponNumericKey, number>> = {};
-    for (const w of weapons) {
-      for (const key of WEAPON_BAR_STAT_KEYS) {
-        const value = w.panel[key];
-        if (typeof value === 'number') max[key] = Math.max(max[key] ?? 0, value);
-      }
-    }
-    return max;
-  }, [weapons]);
+  /** 抽屉进度条用到的字段在全库中的最大值（刻度算法与武器详情页共用 lib/view） */
+  const statMax = useMemo(() => computeStatMax(weapons.map((w) => w.panel)), [weapons]);
 
   /**
    * 卡片点击：阻止默认跳转并打开左侧抽屉；带修饰键（Ctrl/Cmd/Shift）或中键点击时保留浏览器原生新标签页行为

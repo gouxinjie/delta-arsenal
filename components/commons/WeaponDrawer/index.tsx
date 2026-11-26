@@ -8,18 +8,18 @@
 'use client';
 
 import Link from 'next/link';
+import AmmoTile from '@/components/commons/AmmoTile';
 import Drawer from '@/components/commons/Drawer';
+import SectionTitle from '@/components/commons/SectionTitle';
 import SmartImage from '@/components/commons/SmartImage';
-import { AMMO_EFFECT_TONE, CALIBER_ICON, SLOT_NAMES, ammoColor } from '@/constants/game';
+import { SLOT_NAMES } from '@/constants/game';
 import {
   WEAPON_BAR_STAT_KEYS,
   WEAPON_STAT_META,
   WEAPON_VALUE_ROW_KEYS,
 } from '@/constants/weapon';
-import { describeAmmoEffects } from '@/lib/ammo-effects';
-import { formatPercent } from '@/lib/format';
-import { IconAmmo, IconRifle } from '@/components/commons/icons';
-import type { WeaponAmmoBrief, WeaponDetail, WeaponNumericKey } from '@/types/weapon';
+import { IconRifle } from '@/components/commons/icons';
+import type { WeaponDetail, WeaponNumericKey } from '@/types/weapon';
 
 /** WeaponDrawer 组件入参 */
 interface WeaponDrawerProps {
@@ -29,72 +29,6 @@ interface WeaponDrawerProps {
   statMax: Partial<Record<WeaponNumericKey, number>>;
   /** 关闭抽屉回调 */
   onClose: () => void;
-}
-
-/** 分区标题：左侧青绿竖条 + 标题 + 右侧计数徽章 */
-function SectionTitle({ title, count }: { title: string; count?: number }) {
-  return (
-    <h3 className="flex items-center gap-2 text-[13px] font-semibold text-accent mb-3">
-      <span className="w-1 h-3.5 rounded-sm bg-accent [box-shadow:var(--tab-glow)]" aria-hidden="true" />
-      {title}
-      {count !== undefined && (
-        <span className="num ml-auto px-1.5 py-0.5 rounded text-[10px] font-normal text-muted bg-bg border border-edge/70">
-          {count}
-        </span>
-      )}
-    </h3>
-  );
-}
-
-/**
- * 弹药磁贴：口径贴图 + 型号名 + 穿透等级，点击跳转弹药库检索
- * 有命中特效（燃烧 / 爆裂）时，右上角叠加一枚迷你标签，悬浮可看完整参数
- * @param ammo - 弹药摘要数据
- * @param onClose - 抽屉关闭回调（跳转前收起抽屉）
- */
-function AmmoTile({ ammo, onClose }: { ammo: WeaponAmmoBrief; onClose: () => void }) {
-  const color = ammoColor(ammo);
-  const src = CALIBER_ICON[ammo.caliber] ?? '';
-  const effects = describeAmmoEffects(ammo.effects);
-  const effectText = effects.map((e) => e.detail).join(' ');
-  return (
-    <Link
-      href={`/ammo?ammo=${ammo.id}`}
-      onClick={onClose}
-      title={`${ammo.name} · 穿透 ${ammo.pen_level} 级 · 肉伤 ${formatPercent(ammo.dmg_ratio)}${effectText ? ` · ${effectText}` : ''}`}
-      className="relative flex flex-col items-center gap-1 pt-2 pb-1.5 px-1.5 rounded border bg-bg/60 overflow-hidden"
-      style={{ borderColor: `color-mix(in srgb, ${color} 40%, transparent)` }}
-    >
-      {/* 顶部品阶色条：比整块描边更能一眼区分弹药品阶 */}
-      <span className="absolute inset-x-0 top-0 h-0.5 opacity-70" style={{ background: color }} aria-hidden="true" />
-      {/* 特效角标：磁贴空间有限，只放类型名，完整参数走 title */}
-      {effects.length > 0 && (
-        <span
-          className="absolute right-0.5 top-1.5 rounded border bg-bg px-1 text-[9px] leading-[14px] pointer-events-none"
-          style={{ color: AMMO_EFFECT_TONE[effects[0].key], borderColor: AMMO_EFFECT_TONE[effects[0].key] }}
-          aria-hidden="true"
-        >
-          {effects[0].label}
-        </span>
-      )}
-      {/* 贴图区：统一高度保证磁贴等高 */}
-      <span className="h-10 w-full flex items-center justify-center overflow-hidden">
-        <SmartImage
-          src={src}
-          alt={ammo.caliber}
-          className="max-h-full max-w-full object-contain"
-          fallback={<IconAmmo className="w-6 h-6" />}
-        />
-      </span>
-      <span className="text-[11px] leading-tight text-center text-muted line-clamp-2">{ammo.name}</span>
-      <span
-        className="num text-[10px] leading-4 px-1.5 rounded-[3px]"
-        style={{ color, backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)` }}
-      >
-        穿透 {ammo.pen_level}
-      </span>
-    </Link>
-  );
 }
 
 export default function WeaponDrawer({ weapon, statMax, onClose }: WeaponDrawerProps) {
@@ -171,7 +105,7 @@ export default function WeaponDrawer({ weapon, statMax, onClose }: WeaponDrawerP
               {weapon.ammo.length ? (
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
                   {weapon.ammo.map((a) => (
-                    <AmmoTile key={a.id} ammo={a} onClose={onClose} />
+                    <AmmoTile key={a.id} ammo={a} onNavigate={onClose} />
                   ))}
                 </div>
               ) : (

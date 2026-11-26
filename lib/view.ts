@@ -9,8 +9,9 @@
 
 import { parseAmmoEffects } from '@/lib/ammo-effects';
 import { parseJson } from '@/lib/json';
+import { WEAPON_BAR_STAT_KEYS } from '@/constants/weapon';
 import type { AmmoRow, AmmoView, AmmoWeaponBrief } from '@/types/ammo';
-import type { WeaponAmmoBrief, WeaponDetail, WeaponPanel, WeaponRow } from '@/types/weapon';
+import type { WeaponAmmoBrief, WeaponDetail, WeaponNumericKey, WeaponPanel, WeaponRow } from '@/types/weapon';
 
 /**
  * 弹药行 -> 详情抽屉用的弹药摘要
@@ -94,4 +95,21 @@ export function toWeaponDetail(row: WeaponRow, ammo: AmmoRow[]): WeaponDetail {
     slots: parseWeaponSlots(row.slots),
     ammo: ammo.map(toWeaponAmmoBrief),
   };
+}
+
+/**
+ * 计算进度条刻度：各面板字段在全库中的最大值
+ * @description 图鉴抽屉与武器详情页都需要同一套刻度，口径统一在这里，避免两处各算一份
+ * @param panels - 全库武器的面板对象
+ * @returns 字段 -> 最大值；全库都没有该字段时不返回对应键（调用方按 0 处理）
+ */
+export function computeStatMax(panels: WeaponPanel[]): Partial<Record<WeaponNumericKey, number>> {
+  const max: Partial<Record<WeaponNumericKey, number>> = {};
+  for (const panel of panels) {
+    for (const key of WEAPON_BAR_STAT_KEYS) {
+      const value = panel[key];
+      if (typeof value === 'number') max[key] = Math.max(max[key] ?? 0, value);
+    }
+  }
+  return max;
 }

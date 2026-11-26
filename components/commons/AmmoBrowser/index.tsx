@@ -1,13 +1,14 @@
 /**
  * @component AmmoBrowser
- * @description 弹药库浏览器：口径筛选 + 穿透/品阶筛选，按口径分组表格展示，行点击打开详情抽屉
+ * @description 弹药库浏览器：口径筛选 + 穿透/品阶筛选，按口径分组表格展示，行点击打开详情抽屉；
+ *              支持 ?ammo=<id> 深链进入后滚动定位并高亮目标弹药
  * @author gouxinjie
  * @created 2026-11-23
  * @updated 2026-11-26
  */
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Drawer from '@/components/commons/Drawer';
@@ -151,10 +152,17 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
   const [caliber, setCaliber] = useState('全部');
   const [pen, setPen] = useState('全部');
   const [tier, setTier] = useState('全部');
-  /** 用户从列表点开的目标（优先级高于 URL 参数） */
-  const [picked, setPicked] = useState<AmmoView | null>(null);
-  /** 已关闭过的 URL 参数指纹：避免用户关掉抽屉后被同一组参数重新顶开 */
-  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  /** 详情抽屉当前展示的弹药（仅由列表点击打开） */
+  const [selected, setSelected] = useState<AmmoView | null>(null);
+  /** 深链跳入后需要高亮的弹药 id（定位完成后短暂高亮，随后自动清除） */
+  const [flashId, setFlashId] = useState<string | null>(null);
+
+  /** 重置全部筛选条件（移动端把入口收进筛选面板标题行；深链定位失败时也用它兜底） */
+  const resetFilters = useCallback(() => {
+    setCaliber('全部');
+    setPen('全部');
+    setTier('全部');
+  }, []);
 
   /**
    * 当前视口是否达到桌面断点（与 Tailwind 的 md 断点 768px 对齐）
@@ -170,19 +178,57 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
   const ammoParam = sp.get('ammo');
   /** 旧链接兜底：按名称模糊命中 */
   const queryParam = sp.get('q');
-  const paramKey = `${ammoParam ?? ''}|${queryParam ?? ''}`;
 
-  // 选中项由「列表点击」与「URL 参数」派生得到，不在 effect 里 setState：
-  // 路由 query 变化不会重挂载组件，派生值可直接跟随 URL，同时避免级联渲染
-  const selected = useMemo<AmmoView | null>(() => {
-    if (picked) return picked;
-    if (!ammoParam && !queryParam) return null;
-    if (dismissedKey === paramKey) return null;
-    if (ammoParam) return ammo.find((a) => a.id === ammoParam) ?? null;
+  /**
+   * 深链目标：有 ?ammo= 时按 id 精确命中（按名称模糊检索会在 M855 / M855A1 这类同前缀
+   * 弹种上选错），否则用 ?q= 按名称模糊命中；两者都无效时为 null。
+   * 目标只用于「滚动定位 + 高亮」，不自动弹开详情抽屉——详情仍由用户点击条目打开，
+   * 否则抽屉会盖住列表，关掉后用户并不知道自己落在了哪一条上。
+   */
+  const focusId = useMemo(() => {
+    if (ammoParam) return ammo.some((a) => a.id === ammoParam) ? ammoParam : null;
     if (!queryParam) return null;
     const keyword = queryParam.toLowerCase();
-    return ammo.find((a) => a.name.toLowerCase().includes(keyword)) ?? null;
-  }, [picked, ammo, ammoParam, queryParam, paramKey, dismissedKey]);
+    return ammo.find((a) => a.name.toLowerCase().includes(keyword))?.id ?? null;
+  }, [ammo, ammoParam, queryParam]);
+
+  /** 已完成定位的目标 id：同一目标只定位一次，避免用户改筛选时被反复拉回 */
+  const locatedIdRef = useRef<string | null>(null);
+
+  /**
+   * 定位深链目标：等视口判定完成（两套 DOM 收敛为一套）后再滚动，
+   * 避免滚到即将被卸载的那一套；命中的可见条目滚到视口中部并短暂高亮。
+   * 目标被当前筛选条件挡住时先复位筛选再重试（搜索结果常在同一路由内跳转，筛选不会自动清空）。
+   */
+  useEffect(() => {
+    if (!focusId || locatedIdRef.current === focusId) return;
+    // 延迟一拍：等路由切换的「回到顶部」与首帧布局都落定，否则滚动位置会被覆盖
+    const timer = window.setTimeout(() => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>(`[data-ammo-id="${focusId}"]`)).find(
+        (el) => el.offsetParent !== null
+      );
+      if (!target) {
+        if (caliber !== '全部' || pen !== '全部' || tier !== '全部') {
+          resetFilters();
+        } else {
+          locatedIdRef.current = focusId;
+        }
+        return;
+      }
+      locatedIdRef.current = focusId;
+      // 直接定位，不做平滑滚动过渡（深链是「跳转」语义，动画反而拖慢落点）
+      target.scrollIntoView({ block: 'center', behavior: 'auto' });
+      setFlashId(focusId);
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [focusId, showMobileList, showDesktopTable, caliber, pen, tier, resetFilters]);
+
+  /** 高亮 2.4s 后自动淡出，避免强调色长期占用用户注意力 */
+  useEffect(() => {
+    if (!flashId) return;
+    const timer = window.setTimeout(() => setFlashId(null), 2400);
+    return () => window.clearTimeout(timer);
+  }, [flashId]);
 
   const calibers = useMemo(() => ['全部', ...new Set(ammo.map((a) => a.caliber))], [ammo]);
 
@@ -211,13 +257,6 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
     return [...map.entries()];
   }, [filtered]);
 
-  /** 重置全部筛选条件（移动端把入口收进筛选面板标题行） */
-  const resetFilters = () => {
-    setCaliber('全部');
-    setPen('全部');
-    setTier('全部');
-  };
-
   const filterGroups = [
     { label: '口径', value: caliber, set: setCaliber, opts: calibers },
     { label: '穿透等级', value: pen, set: setPen, opts: ['全部', '0', '1', '2', '3', '4', '5', '6', '7'] },
@@ -229,11 +268,10 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
   // 抽屉内的适用枪械（含本地图片，无关联时为空数组）
   const selectedWeapons = selected?.weapons ?? [];
 
-  /** 关闭详情抽屉：同时记录当前参数指纹，避免被 URL 重新顶开 */
+  /** 关闭详情抽屉（useOverlay 以 onClose 为依赖，保持引用稳定避免反复挂卸滚动锁） */
   const closeDrawer = useCallback(() => {
-    setPicked(null);
-    setDismissedKey(paramKey);
-  }, [paramKey]);
+    setSelected(null);
+  }, []);
 
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-5">
@@ -331,10 +369,14 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
                 const weaponCount = splitWeapons(a.weaponNames).length;
                 return (
                   <li key={a.id} className="border-t border-edge/40 first:border-t-0">
+                    {/* data-ammo-id：深链定位用锚点（移动端 / 桌面两套 DOM 共用同一标记） */}
                     <button
                       type="button"
-                      onClick={() => setPicked(a)}
-                      className="w-full px-3 py-2.5 text-left transition-colors active:bg-panel-hi/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/50"
+                      onClick={() => setSelected(a)}
+                      data-ammo-id={a.id}
+                      className={`w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/50 ${
+                        flashId === a.id ? 'bg-accent/10' : 'active:bg-panel-hi/70'
+                      }`}
                     >
                       <div className="flex items-center gap-2">
                         <span className="shrink-0" style={{ color: ammoColor(a) }}>
@@ -412,8 +454,12 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
                     return (
                       <tr
                         key={a.id}
-                        onClick={() => setPicked(a)}
-                        className="border-b border-edge/60 last:border-0 cursor-pointer hover:bg-panel-hi/60 transition-colors"
+                        onClick={() => setSelected(a)}
+                        data-ammo-id={a.id}
+                        className={`border-b border-edge/60 last:border-0 cursor-pointer transition-colors ${
+                          // 命中态用强调色浅底；普通 hover 也走强调色（panel-hi 叠在面板渐变上几乎看不出变化）
+                          flashId === a.id ? 'bg-accent/10' : 'hover:bg-accent/[0.08]'
+                        }`}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
@@ -424,7 +470,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => setPicked(a)}
+                                  onClick={() => setSelected(a)}
                                   aria-label={`查看 ${a.name} 弹药详情`}
                                   className="num text-left font-medium rounded transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
                                 >

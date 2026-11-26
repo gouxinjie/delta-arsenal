@@ -1,11 +1,21 @@
+/**
+ * 武器详情页（SSG）
+ * @description 上半部分是「图 + 名称 + 速览」的信息头，下半部分按 枪械属性 → 适用弹药 → 改装槽位 → 同类武器 分区；
+ *              面板刻度与图鉴抽屉共用 lib/view 的统计口径，弹药磁贴共用 commons/AmmoTile
+ * @author gouxinjie
+ * @created 2026-11-23
+ * @updated 2026-11-26
+ */
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getAllWeapons, getWeapon, getAmmoOfWeapon, getRelatedWeapons } from '@/lib/db';
-import { toWeaponDetail } from '@/lib/view';
-import { describeAmmoEffects } from '@/lib/ammo-effects';
-import { formatPercent } from '@/lib/format';
+import { getAllWeapons, getAmmoOfWeapon, getRelatedWeapons, getWeapon } from '@/lib/db';
+import { computeStatMax, parseWeaponPanel, toWeaponDetail } from '@/lib/view';
+import { WEAPON_BAR_STAT_KEYS, WEAPON_STAT_META, WEAPON_VALUE_ROW_KEYS } from '@/constants/weapon';
+import { SLOT_NAMES } from '@/constants/game';
+import AmmoTile from '@/components/commons/AmmoTile';
+import SectionTitle from '@/components/commons/SectionTitle';
+import SmartImage from '@/components/commons/SmartImage';
 import { IconRifle } from '@/components/commons/icons';
-import { AMMO_EFFECT_TONE, SLOT_NAMES, tierBorderClass, tierTextClass } from '@/constants/game';
 
 export function generateStaticParams() {
   return getAllWeapons().map((w) => ({ id: w.id }));
@@ -25,117 +35,218 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
   // 面板 / 槽位 JSON 的解析与弹药裁剪集中在 lib/view，与图鉴页共用同一口径
   const { panel, slots, ammo } = toWeaponDetail(w, getAmmoOfWeapon(id));
   const related = getRelatedWeapons(w);
+  // 进度条刻度：全库同字段最大值，与图鉴抽屉一致，避免两处百分比不可比
+  const statMax = computeStatMax(getAllWeapons().map((row) => parseWeaponPanel(row.panel)));
 
-  // 面板字段可能缺省（补充源枪械），缺省项在渲染时过滤掉
-  const panelItems: [string, string | number | undefined][] = [
-    ['肉体伤害', panel.meatHarm], ['护甲伤害', panel.armorHarm],
-    ['射速', panel.fireRate], ['有效射程', panel.effectiveRange],
-    ['后坐力控制', panel.recoil], ['操控速度', panel.control],
-    ['瞄准稳定性', panel.stability], ['腰射精度', panel.hipFire],
-    ['枪口初速', panel.muzzleVelocity], ['弹匣容量', panel.magSize],
-    ['声浪范围', panel.soundRadius],
-  ];
+  /**
+   * 「其它参数」：纯数值行 + 开火模式（行顺序见 constants/weapon）
+   * 标签与单位统一取自 WEAPON_STAT_META，缺省项显示「—」
+   */
+  const valueRows = WEAPON_VALUE_ROW_KEYS.map((key) => {
+    if (key === 'fireModes') {
+      return { key, label: '开火模式', value: panel.fireModes?.length ? panel.fireModes.join(' / ') : '—' };
+    }
+    const meta = WEAPON_STAT_META[key];
+    const raw = panel[key];
+    return { key, label: meta.label, value: raw != null ? `${raw}${meta.unit ?? ''}` : '—' };
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-6">
-        <div className="tac-panel md:w-2/5 p-4 flex items-center justify-center">
-          {w.image ? (
-            <img
+    <article className="space-y-4 sm:space-y-5">
+      {/* 面包屑：详情页不套全宽 Hero，用一行面包屑交代层级并提供回退入口 */}
+      <nav aria-label="面包屑" className="flex items-center gap-1.5 text-[11px] text-muted">
+        <Link
+          href="/weapons"
+          className="rounded transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+        >
+          武器图鉴
+        </Link>
+        <span aria-hidden="true" className="text-muted/50">
+          /
+        </span>
+        <span className="num truncate text-main/80">{w.name}</span>
+      </nav>
+
+      {/* 信息头：左图右文，图区沿用图鉴卡片的径向底纹与武器图投影 */}
+      <header className="tac-panel tac-panel-plain overflow-hidden rounded-lg">
+        <div className="flex flex-col sm:flex-row">
+          <div className="thumb-bg flex items-center justify-center border-b border-edge/60 bg-bg/40 px-6 py-5 sm:w-[40%] sm:border-b-0 sm:border-r sm:px-8 sm:py-6">
+            <SmartImage
               src={w.image}
               alt={w.name}
-              loading="lazy"
-              className="max-h-48 w-full object-contain sm:max-h-64"
+              lazy={false}
+              className="weapon-img max-h-[110px] w-full object-contain sm:max-h-[160px]"
+              fallback={<IconRifle className="h-16 w-16 text-muted/25" />}
             />
-          ) : (
-            <span className="text-muted/30" aria-hidden="true">
-              <IconRifle className="w-24 h-24" />
-            </span>
-          )}
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col justify-center p-4 sm:p-5">
+            <h1 className="text-lg font-bold tracking-wide sm:text-2xl">{w.name}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {/* 类别用中性描边标签、口径用强调色标签，与图鉴卡片保持同一套语义色 */}
+              <span className="rounded border border-edge/70 bg-bg/60 px-1.5 py-px text-[11px] text-muted sm:text-xs">
+                {w.category}
+              </span>
+              <span className="num rounded bg-accent/10 px-1.5 py-px text-[11px] font-medium text-accent sm:text-xs">
+                {w.caliber || '—'}
+              </span>
+            </div>
+
+            {/* 速览三格：弹药数 / 槽位数 / 开火模式，纯文字列表之前要读两屏才知道 */}
+            <dl className="num mt-4 grid grid-cols-3 gap-1.5">
+              <div className="rounded border border-edge/70 bg-bg/50 px-2 py-1.5">
+                <dt className="text-[10px] leading-tight text-muted">可用弹药</dt>
+                <dd className="mt-0.5 text-sm font-semibold text-accent">{ammo.length}</dd>
+              </div>
+              <div className="rounded border border-edge/70 bg-bg/50 px-2 py-1.5">
+                <dt className="text-[10px] leading-tight text-muted">改装槽位</dt>
+                <dd className="mt-0.5 text-sm font-semibold text-accent">{slots.length}</dd>
+              </div>
+              <div className="min-w-0 rounded border border-edge/70 bg-bg/50 px-2 py-1.5">
+                <dt className="text-[10px] leading-tight text-muted">弹匣容量</dt>
+                <dd className="mt-0.5 truncate text-sm font-semibold text-accent">
+                  {panel.magSize != null ? `${panel.magSize} 发` : '—'}
+                </dd>
+              </div>
+            </dl>
+          </div>
         </div>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold">{w.name}</h1>
-          <p className="num text-sm text-muted mt-1">
-            {w.category} · {w.caliber || '—'}
-          </p>
-          <div className="mt-4 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-            {panelItems
-              .filter(([, v]) => v !== null && v !== undefined && v !== '')
-              .map(([k, v]) => (
-                <div key={k} className="flex justify-between border-b border-edge py-2 text-sm">
-                  <span className="text-muted">{k}</span>
-                  <span className="num">{v}</span>
+      </header>
+
+      {/* 枪械属性：核心性能（进度条）+ 其它参数（纯数值行），两组用竖线分隔避免数字混读 */}
+      <section className="tac-panel tac-panel-plain rounded-lg p-4 sm:p-5">
+        <SectionTitle as="h2" title="枪械属性" />
+        <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+          <div>
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-[0.06em] text-muted">
+              <span className="h-1.5 w-1.5 rounded-[1px] bg-accent" aria-hidden="true" />
+              核心性能
+            </p>
+            <div className="space-y-1">
+              {WEAPON_BAR_STAT_KEYS.map((key) => {
+                const meta = WEAPON_STAT_META[key];
+                const value = panel[key] ?? null;
+                const max = statMax[key] ?? 0;
+                const pct = value != null && max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
+                return (
+                  <div key={key} className="flex h-7 items-center gap-2">
+                    <span className="w-[72px] shrink-0 whitespace-nowrap text-[11px] text-muted">{meta.label}</span>
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-edge/80">
+                      <span
+                        className="block h-full rounded-full bg-gradient-to-r from-accent/40 to-accent [box-shadow:var(--bar-glow)]"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </span>
+                    <span className="num w-14 shrink-0 text-right text-[13px] font-medium text-main">
+                      {value ?? '—'}
+                      {value != null && meta.unit ? meta.unit : ''}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="sm:border-l sm:border-edge/60 sm:pl-6">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-[0.06em] text-muted">
+              <span className="h-1.5 w-1.5 rounded-[1px] bg-info" aria-hidden="true" />
+              其它参数
+            </p>
+            <div className="space-y-0.5">
+              {valueRows.map((r) => (
+                <div
+                  key={r.key}
+                  className="-mx-1 flex h-7 items-center justify-between gap-2 border-b border-edge/40 px-1 last:border-b-0"
+                >
+                  <span className="whitespace-nowrap text-[11px] text-muted">{r.label}</span>
+                  <span className="num truncate text-[13px] text-accent">{r.value}</span>
                 </div>
               ))}
+            </div>
           </div>
-          {panel.fireModes && panel.fireModes.length > 0 && (
-            <p className="num text-xs text-muted mt-3">开火模式：{panel.fireModes.join(' / ')}</p>
-          )}
         </div>
-      </div>
+        <p className="mt-4 border-t border-edge/60 pt-3 text-[11px] leading-relaxed text-muted/80">
+          面板数值来自官方数据源，不同来源枪械字段完整度略有差异。仅供参考，以游戏内实测为准。
+        </p>
+      </section>
 
-      <section>
-        <h2 className="font-bold mb-2">适用弹药 <span className="num text-xs text-muted">({ammo.length})</span></h2>
+      {/* 适用弹药：与武器抽屉同款磁贴，点击到弹药库定位并高亮对应型号 */}
+      <section className="tac-panel tac-panel-plain rounded-lg p-4 sm:p-5">
+        <SectionTitle
+          as="h2"
+          title="适用弹药"
+          count={ammo.length}
+          extra={
+            <Link href="/ammo" className="transition-colors hover:text-accent">
+              弹药库 →
+            </Link>
+          }
+        />
         {ammo.length ? (
-          <div className="grid gap-2">
-            {ammo.map((a) => {
-              // 命中特效（燃烧 / 爆裂）：构建期已解析，有则名称后跟一枚标签，悬浮看完整参数
-              const effects = describeAmmoEffects(a.effects);
-              return (
-                <Link
-                  key={a.id}
-                  href={`/ammo?ammo=${a.id}`}
-                  className={`tac-panel !border-l-2 ${a.tier ? tierBorderClass(a.tier) : 'border-l-edge'} px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm hover:border-accent transition-colors`}
-                >
-                  <span>{a.name}</span>
-                  {effects.map((e) => (
-                    <span
-                      key={e.key}
-                      className="badge shrink-0"
-                      style={{ color: AMMO_EFFECT_TONE[e.key], borderColor: AMMO_EFFECT_TONE[e.key] }}
-                      title={e.detail}
-                    >
-                      {e.label}
-                    </span>
-                  ))}
-                  <span className="num text-xs text-muted ml-auto">
-                    穿透 <b className={a.tier ? tierTextClass(a.tier) : ''}>{a.pen_level}</b> 级 · 伤害
-                    {formatPercent(a.dmg_ratio)}
-                  </span>
-                </Link>
-              );
-            })}
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {ammo.map((a) => (
+              <AmmoTile key={a.id} ammo={a} size="md" />
+            ))}
           </div>
         ) : (
-          <p className="text-sm text-muted">暂无关联弹药数据</p>
+          <p className="text-sm text-muted">暂无关联弹药数据（补充源枪械可能缺失关联）</p>
         )}
       </section>
 
-      <section>
-        <h2 className="font-bold mb-2">可改装槽位 <span className="num text-xs text-muted">({slots.length})</span></h2>
-        <div className="flex flex-wrap gap-2">
-          {slots.map((s) => (
-            <span key={s} className="num text-xs border border-edge rounded px-2 py-1 text-muted">
-              {SLOT_NAMES[s] ?? `槽位 ${s}`}
-            </span>
-          ))}
-          {!slots.length && <span className="text-sm text-muted">暂无数据（补充源枪械）</span>}
-        </div>
+      {/* 可改装槽位（数据源只有槽位清单，没有具体改枪方案） */}
+      <section className="tac-panel tac-panel-plain rounded-lg p-4 sm:p-5">
+        <SectionTitle as="h2" title="可改装槽位" count={slots.length} />
+        {slots.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {slots.map((s) => (
+              <span
+                key={s}
+                className="num rounded border border-edge bg-bg/40 px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/60 hover:bg-panel-hi hover:text-main"
+              >
+                {SLOT_NAMES[s] ?? `槽位 ${s}`}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">暂无槽位数据（补充源枪械）</p>
+        )}
       </section>
 
       {related.length > 0 && (
-        <section>
-          <h2 className="font-bold mb-2">同类武器</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <section className="tac-panel tac-panel-plain rounded-lg p-4 sm:p-5">
+          <SectionTitle
+            as="h2"
+            title="同类武器"
+            extra={
+              <Link href="/weapons" className="transition-colors hover:text-accent">
+                全部图鉴 →
+              </Link>
+            }
+          />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {related.map((r) => (
-              <Link key={r.id} href={`/weapons/${r.id}`} className="tac-panel p-3 hover:border-accent transition-colors">
-                <p className="text-sm truncate">{r.name}</p>
-                <p className="num text-[11px] text-muted mt-0.5">{r.caliber || '—'}</p>
+              <Link
+                key={r.id}
+                href={`/weapons/${r.id}`}
+                className="group flex items-center gap-2.5 rounded border border-edge bg-bg/40 px-2.5 py-2 transition-colors hover:border-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+              >
+                <span className="thumb-bg flex h-10 w-16 shrink-0 items-center justify-center rounded bg-bg">
+                  <SmartImage
+                    src={r.image}
+                    alt={r.name}
+                    className="weapon-img max-h-8 max-w-full object-contain"
+                    fallback={<IconRifle className="h-5 w-5 text-muted/30" />}
+                  />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm transition-colors group-hover:text-accent">{r.name}</span>
+                  <span className="num block truncate text-[11px] text-muted">{r.caliber || '—'}</span>
+                </span>
               </Link>
             ))}
           </div>
         </section>
       )}
-    </div>
+    </article>
   );
 }
