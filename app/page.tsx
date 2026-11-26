@@ -19,8 +19,10 @@ interface EntranceCard {
   tag: string;
   /** 标题 */
   title: string;
-  /** 一句话说明 */
+  /** 一句话说明（桌面） */
   desc: string;
+  /** 移动端精简说明（两列卡片宽度有限，避免文字被截断） */
+  short: string;
   /** 图标节点（尺寸由图标自身 className 控制） */
   icon: ReactNode;
   /** 在网格中的跨度类名（sm 2 列 / lg 3 列下控制主次，空串表示单列） */
@@ -333,8 +335,9 @@ export default function Home() {
       tag: 'CORE',
       title: '穿甲对照矩阵',
       desc: '弹种 × 护甲等级速查，出装前看一眼带几级弹。三色判定一眼看清能否打穿。',
-      icon: <IconChart className="h-7 w-7" />,
-      span: 'sm:col-span-2 lg:col-span-2',
+      short: '弹种 × 护甲等级三色速查，出装前先看一眼。',
+      icon: <IconChart className="h-5 w-5 sm:h-7 sm:w-7" />,
+      span: 'col-span-2 sm:col-span-2 lg:col-span-2',
       core: true,
     },
     {
@@ -342,7 +345,8 @@ export default function Home() {
       tag: 'AMMO',
       title: '弹药库',
       desc: `全口径 ${counts.ammo} 种弹药：穿透等级、伤害比例、适用枪械。`,
-      icon: <IconAmmo className="h-7 w-7" />,
+      short: `全口径 ${counts.ammo} 种弹药的穿透与伤害`,
+      icon: <IconAmmo className="h-5 w-5 sm:h-7 sm:w-7" />,
       span: '',
     },
     {
@@ -350,7 +354,8 @@ export default function Home() {
       tag: 'ARMS',
       title: '武器图鉴',
       desc: `收录 ${counts.weapons} 把枪械：面板、口径、可改装槽位。`,
-      icon: <IconBook className="h-7 w-7" />,
+      short: `${counts.weapons} 把枪械的面板与改装数据`,
+      icon: <IconBook className="h-5 w-5 sm:h-7 sm:w-7" />,
       span: '',
     },
     {
@@ -358,8 +363,9 @@ export default function Home() {
       tag: 'SOON',
       title: '改枪码',
       desc: '二期上线，敬请期待。',
-      icon: <IconUnknown className="h-7 w-7" />,
-      span: 'sm:col-span-2 lg:col-span-2',
+      short: '二期上线，敬请期待。',
+      icon: <IconUnknown className="h-5 w-5 sm:h-7 sm:w-7" />,
+      span: 'col-span-2 sm:col-span-2 lg:col-span-2',
       soon: true,
     },
   ];
@@ -367,7 +373,7 @@ export default function Home() {
   return (
     <div>
       {/* ============ Hero：全宽战术横幅（与内页 PageHero 同一视觉语言） ============ */}
-      <section className="relative -mt-4 mb-8 mx-[calc(50%-50vw)] overflow-hidden border-b border-accent/25">
+      <section className="relative -mt-4 mb-5 mx-[calc(50%-50vw)] overflow-hidden border-b border-accent/25 sm:mb-8">
         {/* 氛围层 1：主题化渐变底 */}
         <div className="absolute inset-0" style={{ background: 'var(--hero-bg)' }} aria-hidden="true" />
         {/* 氛围层 2：战术网格（右侧渐隐，给装饰环留白） */}
@@ -380,17 +386,17 @@ export default function Home() {
         <div className="absolute inset-0" style={{ background: 'var(--hero-sweep)' }} aria-hidden="true" />
         <HeroRadar />
 
-        <div className="relative mx-auto max-w-[1200px] px-4 py-10 sm:py-14">
+        <div className="relative mx-auto max-w-[1200px] px-4 py-8 sm:py-14">
           <p className="num flex items-center gap-2.5 text-[11px] tracking-[0.32em] text-accent">
             <span className="h-px w-8 bg-accent/60" aria-hidden="true" />
             DELTA ARSENAL // {season} 数据集
           </p>
 
-          <h1 className="mt-4 text-[30px] font-bold leading-[1.15] tracking-[0.1em] title-glow sm:mt-5 sm:text-5xl sm:tracking-[0.14em]">
+          <h1 className="mt-3 text-[30px] font-bold leading-[1.15] tracking-[0.1em] title-glow sm:mt-5 sm:text-5xl sm:tracking-[0.14em]">
             三角洲<span className="text-accent">军械库</span>
           </h1>
 
-          <p className="mt-4 text-sm tracking-wider text-muted sm:text-[15px]">
+          <p className="mt-3 text-sm tracking-wider text-muted sm:mt-4 sm:text-[15px]">
             情报，永远比子弹先到一步。
           </p>
           <p className="mt-1.5 max-w-[520px] text-[13px] leading-relaxed text-muted/70 sm:text-sm">
@@ -398,7 +404,7 @@ export default function Home() {
           </p>
 
           {/* 主 CTA */}
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3 sm:mt-8">
             <Link
               href="/ammo/matrix"
               className="group inline-flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-[13px] font-bold tracking-wide text-[color:var(--on-accent)] transition-all [box-shadow:var(--box-glow)] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
@@ -417,7 +423,7 @@ export default function Home() {
           </div>
 
           {/* 数据速览：等宽数字 + 细分隔线；窄屏两列摆放，避免长版本号溢出 */}
-          <dl className="mt-8 grid grid-cols-2 gap-x-5 gap-y-5 sm:flex sm:flex-wrap sm:items-end sm:gap-x-10">
+          <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 sm:mt-8 sm:flex sm:flex-wrap sm:items-end sm:gap-x-10 sm:gap-y-5">
             <div className="border-l border-accent/30 pl-3">
               <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">弹药 AMMO</dt>
               <dd className="num mt-1 text-2xl font-bold leading-none text-accent">{counts.ammo}</dd>
@@ -438,7 +444,7 @@ export default function Home() {
             </div>
           </dl>
 
-          <p className="mt-7 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] tracking-wider text-muted/50">
+          <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] tracking-wider text-muted/50 sm:mt-7">
             <span>非官方粉丝站点 · 数据仅供参考，以游戏内实测为准</span>
             <a
               href="#data-source"
@@ -456,19 +462,19 @@ export default function Home() {
         />
       </section>
 
-      {/* ============ 模块入口：Bento 网格（核心卡占双列） ============ */}
-      <section className="space-y-4">
+      {/* ============ 模块入口：Bento 网格（移动端 2 列紧凑排布，核心/二期卡占整行） ============ */}
+      <section className="space-y-3 sm:space-y-4">
         <div className="flex items-end justify-between">
           <h2 className="text-[13px] font-bold tracking-[0.2em] text-muted">核心模块</h2>
           <span className="num text-[10px] tracking-[0.2em] text-muted/50">4 MODULES</span>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {cards.map((c, i) => (
             <Link
               key={c.href}
               href={c.href}
-              className={`tac-panel tac-panel-plain group relative flex flex-col overflow-hidden rounded-xl p-4 sm:p-5 ${c.span} ${
+              className={`tac-panel tac-panel-plain group relative flex flex-col overflow-hidden rounded-xl p-3.5 sm:p-5 ${c.span} ${
                 c.soon ? 'opacity-70 hover:border-edge' : 'tac-hover-flat'
               }`}
             >
@@ -487,10 +493,10 @@ export default function Home() {
               {/* 三色判定示意（仅核心卡） */}
               {c.core && <MatrixPreview />}
 
-              {/* 二期功能卡：右侧大号状态水印，填补双列留白 */}
+              {/* 二期功能卡：右侧状态水印，移动端也保留，用来补足整行卡片的右侧留白 */}
               {c.soon && (
                 <span
-                  className="pointer-events-none absolute right-6 top-1/2 hidden -translate-y-1/2 select-none num text-[64px] font-bold leading-none tracking-[0.12em] text-accent/[0.06] sm:block"
+                  className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 select-none num text-[40px] font-bold leading-none tracking-[0.12em] text-accent/[0.06] sm:right-6 sm:text-[64px]"
                   aria-hidden="true"
                 >
                   SOON
@@ -499,7 +505,7 @@ export default function Home() {
 
               <div className="relative flex items-start justify-between gap-3">
                 <span
-                  className={`flex h-14 w-14 items-center justify-center rounded-lg border transition-colors ${
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg border transition-colors sm:h-14 sm:w-14 ${
                     c.core
                       ? 'border-accent/45 bg-gradient-to-br from-accent/25 to-accent/5 text-accent [box-shadow:var(--box-glow)]'
                       : 'border-edge bg-panel-hi text-muted group-hover:text-accent'
@@ -507,30 +513,37 @@ export default function Home() {
                 >
                   {c.icon}
                 </span>
-                <span className="num text-[11px] tracking-[0.2em] text-muted/40">
+                <span className="num text-[10px] tracking-[0.2em] text-muted/40 sm:text-[11px]">
                   {String(i + 1).padStart(2, '0')}
                 </span>
               </div>
 
-              <span className={`badge relative mt-5 w-fit ${c.core ? 'border-accent/40 text-accent' : ''}`}>
+              {/* 二期卡的角标在移动端隐藏：标题旁已有「二期上线」说明，省一行高度 */}
+              <span
+                className={`badge relative mt-3 w-fit sm:mt-5 ${c.core ? 'border-accent/40 text-accent' : ''} ${
+                  c.soon ? '!hidden sm:!inline-flex' : ''
+                }`}
+              >
                 {c.tag}
                 {c.core && ' ★'}
               </span>
 
               <h3
-                className={`relative mt-2.5 text-lg font-bold tracking-wide transition-colors ${
+                className={`relative mt-1.5 text-base font-bold tracking-wide transition-colors sm:mt-2.5 sm:text-lg ${
                   c.core ? 'text-accent' : 'group-hover:text-accent'
                 }`}
               >
                 {c.title}
               </h3>
-              <p className="relative mt-1.5 max-w-[420px] text-sm leading-relaxed text-muted">
-                {c.desc}
+              {/* 移动端两列宽度有限，用精简文案；桌面仍是完整描述 */}
+              <p className="relative mt-1 max-w-[420px] text-[12px] leading-relaxed text-muted sm:mt-1.5 sm:text-sm">
+                <span className="sm:hidden">{c.short}</span>
+                <span className="hidden sm:inline">{c.desc}</span>
               </p>
 
               <span
-                className={`relative mt-auto flex items-center gap-1.5 pt-5 text-[11px] tracking-[0.18em] ${
-                  c.soon ? 'num text-muted/60' : 'num text-muted group-hover:text-accent'
+                className={`relative mt-auto items-center gap-1.5 pt-3 text-[11px] tracking-[0.18em] sm:pt-5 ${
+                  c.soon ? 'hidden sm:flex num text-muted/60' : 'flex num text-muted group-hover:text-accent'
                 }`}
               >
                 {c.soon ? 'COMING SOON' : '进入模块'}
