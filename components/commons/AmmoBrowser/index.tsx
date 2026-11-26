@@ -265,8 +265,8 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
 
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-5">
-      {/* 筛选面板：窄屏压成「标题 + 重置」一行 + 两行下拉，桌面恢复竖排 */}
-      <aside className="md:w-48 md:shrink-0 md:sticky md:top-20 self-start">
+      {/* 筛选面板：窄屏占满整行，桌面恢复 192px 侧栏（不加 w-full 会因 self-start 收缩成半屏） */}
+      <aside className="w-full self-start md:sticky md:top-20 md:w-48 md:shrink-0">
         <div className="tac-panel tac-panel-plain rounded-lg p-3 md:p-3.5">
           <div className="flex items-center justify-between gap-2 border-b border-edge pb-2">
             <h2 className="text-[11px] tracking-[0.2em] text-muted uppercase">筛选条件</h2>
@@ -318,88 +318,99 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
           >
             重置筛选
           </button>
-          <p className="num text-[11px] text-muted leading-relaxed mt-2.5 md:mt-0 md:pt-2 md:border-t md:border-edge">
-            共 <b className="text-accent">{filtered.length}</b> 种
-            <span className="hidden md:block">
-              <br />
+          <div className="mt-2.5 border-t border-edge pt-2 md:mt-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="num text-[11px] text-muted">
+                共 <b className="text-accent">{filtered.length}</b> 种
+              </p>
+              {/* 移动端矩阵入口只保留这一处，组标题不再重复 */}
+              <Link href="/ammo/matrix" className="text-[11px] text-muted hover:text-accent transition-colors md:hidden">
+                穿甲对照 →
+              </Link>
+            </div>
+            <p className="num mt-2 hidden border-t border-edge pt-2 text-[11px] leading-relaxed text-muted md:block">
               穿透等级即玩家俗称的「N级弹」
-            </span>
-          </p>
+            </p>
+          </div>
         </div>
       </aside>
 
-      {/* 分组列表：窄屏走卡片，md 以上走宽表 */}
-      <div className="flex-1 space-y-5 md:space-y-6 min-w-0">
+      {/* 分组列表：窄屏走紧凑双行条目，md 以上走宽表 */}
+      <div className="flex-1 space-y-3 min-w-0 md:space-y-6">
         {grouped.map(([cal, list]) => (
           <section key={cal} className="tac-panel tac-panel-plain rounded-lg overflow-hidden">
-            <h2 className="num text-base text-accent px-3.5 py-3 border-b border-edge flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:px-4">
-              <CaliberIcon caliber={cal} className="w-7 h-7" />
-              {cal}
+            <h2 className="num flex items-center gap-2 border-b border-edge px-3 py-2.5 text-sm text-accent sm:px-4 sm:py-3 sm:text-base">
+              <CaliberIcon caliber={cal} className="h-6 w-6 sm:h-7 sm:w-7" />
+              <span className="truncate">{cal}</span>
               <span className="badge shrink-0 text-muted">{list.length} 种</span>
-              <span className="hidden flex-1 sm:block" />
               <Link
                 href="/ammo/matrix"
-                className="ml-auto whitespace-nowrap text-[11px] text-muted hover:text-accent transition-colors sm:ml-0"
+                className="ml-auto hidden shrink-0 whitespace-nowrap text-[11px] font-normal text-muted hover:text-accent transition-colors sm:inline"
               >
                 穿甲对照 →
               </Link>
             </h2>
 
-            {/* 移动端卡片列表：宽表在窄屏只能左右拖，改成纵向信息卡更易读 */}
-            <ul className="md:hidden divide-y divide-edge/60">
+            {/* 移动端条目：口径已由组标题承载，条目只留「名称 / 品阶 / 穿透 / 双伤害 / 枪械数」 */}
+            <ul className="md:hidden">
               {list.map((a) => {
-                const weapons = splitWeapons(a.weaponNames);
+                const effects = describeAmmoEffects(a.effects);
+                const weaponCount = splitWeapons(a.weaponNames).length;
                 return (
-                  <li key={a.id}>
+                  <li key={a.id} className="border-t border-edge/40 first:border-t-0">
                     <button
                       type="button"
                       onClick={() => setSelected(a)}
-                      className="w-full px-3.5 py-3 text-left transition-colors active:bg-panel-hi/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/50"
+                      className="w-full px-3 py-2.5 text-left transition-colors active:bg-panel-hi/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/50"
                     >
-                      <div className="flex items-start gap-2.5">
-                        <span className="mt-0.5 shrink-0" style={{ color: ammoTierColor(a) }}>
-                          <IconAmmo className="w-4 h-4" />
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0" style={{ color: ammoTierColor(a) }}>
+                          <IconAmmo className="h-3.5 w-3.5" />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="num text-[15px] font-medium">{a.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="num truncate text-[14px] font-medium">{a.name}</span>
                             <TierBadge a={a} />
                             {a.season_limited === 1 && (
-                              <span className="badge !text-danger !border-danger/40" title={a.note || '赛季限定弹药'}>
+                              <span className="badge shrink-0 !text-danger !border-danger/40" title={a.note || '赛季限定弹药'}>
                                 {seasonTag(a.note) || '赛季'}限定
                               </span>
                             )}
-                          </div>
-                          <p className="num text-[11px] text-muted mt-1">
-                            {a.caliber}
-                            {a.season_limited !== 1 && a.note ? ` · ${a.note}` : ''}
-                          </p>
-
-                          {/* 关键数值：与桌面表格同口径，纵向排列，不横向滚动 */}
-                          <div className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
-                            <span className="text-[11px] text-muted">穿透</span>
-                            <PenBadge pen={a.pen_level} />
-                            <span className="text-[11px] text-muted">肉体</span>
-                            <DmgBar ratio={a.dmg_ratio} color={dmgColor(a.dmg_ratio)} />
-                            <span className="text-[11px] text-muted">护甲</span>
-                            <DmgBar ratio={a.armor_ratio} color={armorColor(a.armor_ratio)} />
+                            <span className="ml-auto flex shrink-0 items-center gap-1">
+                              <PenBadge pen={a.pen_level} />
+                              <span className="text-base leading-none text-muted/40" aria-hidden="true">
+                                ›
+                              </span>
+                            </span>
                           </div>
 
-                          {describeAmmoEffects(a.effects).length > 0 && (
-                            <div className="mt-2">
-                              <EffectBadges effects={a.effects} />
-                            </div>
-                          )}
-
-                          {weapons.length > 0 && (
-                            <p className="mt-2 text-[11px] leading-[1.6] text-muted line-clamp-1">
-                              适用：{weapons.join('、')}
-                            </p>
-                          )}
+                          {/* 伤害倍率与关联枪械压成一行，用竖线分隔，避免数字与下一个标签粘连 */}
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted">
+                            <span className="inline-flex items-baseline gap-1">
+                              肉体
+                              <b className="num text-[12px] font-semibold" style={{ color: dmgColor(a.dmg_ratio) }}>
+                                {Math.round(a.dmg_ratio * 100)}%
+                              </b>
+                            </span>
+                            <span className="inline-flex items-baseline gap-1 border-l border-edge/70 pl-2.5">
+                              护甲
+                              <b className="num text-[12px] font-semibold" style={{ color: armorColor(a.armor_ratio) }}>
+                                {Math.round(a.armor_ratio * 100)}%
+                              </b>
+                            </span>
+                            {weaponCount > 0 && <span className="num border-l border-edge/70 pl-2.5">适用 {weaponCount} 把</span>}
+                            {effects.map((e) => (
+                              <span
+                                key={e.key}
+                                className="badge shrink-0"
+                                style={{ color: AMMO_EFFECT_TONE[e.key], borderColor: AMMO_EFFECT_TONE[e.key] }}
+                                title={e.detail}
+                              >
+                                {e.label}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                        <span className="mt-1 shrink-0 text-lg leading-none text-muted/40" aria-hidden="true">
-                          ›
-                        </span>
                       </div>
                     </button>
                   </li>
