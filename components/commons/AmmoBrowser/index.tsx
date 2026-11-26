@@ -3,68 +3,26 @@
  * @description 弹药库浏览器：口径筛选 + 穿透/品阶筛选，按口径分组表格展示，行点击打开详情抽屉
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-25
+ * @updated 2026-11-26
  */
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Drawer from '@/components/commons/Drawer';
+import SmartImage from '@/components/commons/SmartImage';
 import { IconAmmo, IconRifle } from '@/components/commons/icons';
-import { AMMO_EFFECT_TONE, CALIBER_ICON, RARITY_LABEL, tierColor } from '@/constants/game';
+import {
+  AMMO_EFFECT_TONE,
+  CALIBER_ICON,
+  RARITY_LABEL,
+  ammoColor,
+  isExclusiveAmmo,
+} from '@/constants/game';
 import { describeAmmoEffects } from '@/lib/ammo-effects';
-import { useOverlay } from '@/hooks/useOverlay';
-import type { AmmoEffects } from '@/types/ammo';
-
-/** 弹药的适用枪械（含本地图片，供详情抽屉展示） */
-interface AmmoWeapon {
-  /** 武器 objectID，用于跳转 /weapons/[id] */
-  id: string;
-  /** 武器名 */
-  name: string;
-  /** 本地图片路径，空串表示无图 */
-  image: string;
-}
-
-/** 弹药展示模型（来自 lib/db 的 getAmmoWithWeapons 聚合结果） */
-interface AmmoItem {
-  /** 弹药 itemID */
-  id: string;
-  /** 弹药型号名（不含口径前缀） */
-  name: string;
-  /** 口径，如 5.56x45mm */
-  caliber: string;
-  /** 品阶 1-5，专属弹可能为 null */
-  tier: number | null;
-  /** 品阶中文名：白/绿/蓝/紫/橙/金 */
-  rarity: string;
-  /** 穿透等级 0-7 */
-  pen_level: number;
-  /** 肉体伤害倍率 */
-  dmg_ratio: number;
-  /** 护甲伤害倍率 */
-  armor_ratio: number;
-  /** 命中特效（构建期由 effects JSON 解析而来），无特效为空对象 */
-  effects?: AmmoEffects;
-  /** 是否赛季限定（1=是） */
-  season_limited: number;
-  /** 备注：限定弹标注赛季，特殊弹标注机制，可为空串 */
-  note?: string;
-  /** 适用枪械名（顿号分隔） */
-  weaponNames: string | null;
-  /** 适用枪械明细（含图片），无关联为空数组 */
-  weapons?: AmmoWeapon[];
-}
-
-/**
- * 弹药品阶配色：红品阶（专属弹，穿 6/7）与常规五阶分开取色
- * @param a - 弹药数据
- * @returns 主题色变量
- */
-function ammoTierColor(a: AmmoItem): string {
-  if (a.rarity === '红' || a.pen_level >= 6) return 'var(--danger)';
-  return tierColor(a.tier);
-}
+import { formatPercent } from '@/lib/format';
+import type { AmmoEffects, AmmoView } from '@/types/ammo';
 
 /**
  * 从备注中提取赛季号（限定弹备注形如「S11赛季限定子弹」）
@@ -77,11 +35,11 @@ function seasonTag(note?: string): string {
 
 /**
  * 拆分适用枪械名并按拼音稳定排序（数据库 GROUP_CONCAT 顺序随查询计划变化）
- * @param names - 「、」分隔的枪械名字符串
+ * @param names - 「、」分隔的枪械名字符串，无关联为空串
  * @returns 排序后的枪名数组，无数据时为空数组
  */
-function splitWeapons(names: string | null): string[] {
-  return (names ?? '').split('、').filter(Boolean).sort((x, y) => x.localeCompare(y, 'zh'));
+function splitWeapons(names: string): string[] {
+  return names.split('、').filter(Boolean).sort((x, y) => x.localeCompare(y, 'zh'));
 }
 
 /**
@@ -103,29 +61,24 @@ function armorColor(ratio: number): string {
 }
 
 /**
- * 口径图标：优先使用官方真实贴图，无贴图时回退到子弹 SVG
- * @param caliber - 口径名（数据源原始值）
- * @param className - 尺寸等样式类
+ * 口径图标：优先使用官方真实贴图，无贴图或加载失败时回退到子弹 SVG
+ * @param props.caliber - 口径名（数据源原始值）
+ * @param props.className - 尺寸等样式类
  */
 function CaliberIcon({ caliber, className }: { caliber: string; className?: string }) {
-  const src = CALIBER_ICON[caliber];
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={caliber}
-        loading="lazy"
-        className={`${className ?? ''} object-contain shrink-0`}
-        onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
-      />
-    );
-  }
-  return <IconAmmo className={className} />;
+  return (
+    <SmartImage
+      src={CALIBER_ICON[caliber] ?? ''}
+      alt={caliber}
+      className={`${className ?? ''} object-contain shrink-0`}
+      fallback={<IconAmmo className={className} />}
+    />
+  );
 }
 
 /** 品阶徽章 */
-function TierBadge({ a }: { a: AmmoItem }) {
-  const color = ammoTierColor(a);
+function TierBadge({ a }: { a: AmmoView }) {
+  const color = ammoColor(a);
   return (
     <span className="badge shrink-0" style={{ color, borderColor: color }} title={`品阶：${a.tier ?? '专属'}（${a.rarity}）`}>
       {RARITY_LABEL[a.rarity] ?? `${a.tier ?? '?'}阶`}
@@ -159,7 +112,7 @@ function DmgBar({ ratio, color }: { ratio: number; color: string }) {
   return (
     <div className="flex items-center gap-2.5">
       <span className="num text-sm font-semibold w-10 text-right shrink-0" style={{ color }}>
-        {pct}%
+        {formatPercent(ratio)}
       </span>
       <div className="block w-10 h-1.5 bg-bg rounded overflow-hidden sm:w-16">
         <div className="h-full rounded" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
@@ -192,13 +145,13 @@ function EffectBadges({ effects }: { effects?: AmmoEffects }) {
   );
 }
 
-export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
+export default function AmmoBrowser({ ammo }: { ammo: AmmoView[] }) {
   const sp = useSearchParams();
   const [caliber, setCaliber] = useState('全部');
   const [pen, setPen] = useState('全部');
   const [tier, setTier] = useState('全部');
   /** 用户从列表点开的目标（优先级高于 URL 参数） */
-  const [picked, setPicked] = useState<AmmoItem | null>(null);
+  const [picked, setPicked] = useState<AmmoView | null>(null);
   /** 已关闭过的 URL 参数指纹：避免用户关掉抽屉后被同一组参数重新顶开 */
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
 
@@ -210,7 +163,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
 
   // 选中项由「列表点击」与「URL 参数」派生得到，不在 effect 里 setState：
   // 路由 query 变化不会重挂载组件，派生值可直接跟随 URL，同时避免级联渲染
-  const selected = useMemo<AmmoItem | null>(() => {
+  const selected = useMemo<AmmoView | null>(() => {
     if (picked) return picked;
     if (!ammoParam && !queryParam) return null;
     if (dismissedKey === paramKey) return null;
@@ -227,23 +180,23 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
       ammo.filter((a) => {
         if (caliber !== '全部' && a.caliber !== caliber) return false;
         if (pen !== '全部' && String(a.pen_level) !== pen) return false;
-        // 品阶：专属弹（红品阶）无常规阶数，单独作为一个筛选项
+        // 品阶：专属弹单独作为一个筛选项
+        // 判定 = 矩阵页同款 isExclusiveAmmo（穿 6/7 或红品阶）∪ 无常规品阶（tier 为 null），两者取并集不漏弹
         if (tier === '专属') {
-          if (a.rarity !== '红' && a.tier !== null) return false;
+          if (!isExclusiveAmmo(a) && a.tier !== null) return false;
         } else if (tier !== '全部' && String(a.tier) !== tier) return false;
         return true;
       }),
     [ammo, caliber, pen, tier]
   );
 
+  // 组内顺序由 SQL 保证（ORDER BY caliber, pen_level DESC, tier DESC），此处只做分组，不再重复排序
   const grouped = useMemo(() => {
-    const map = new Map<string, AmmoItem[]>();
+    const map = new Map<string, AmmoView[]>();
     for (const a of filtered) {
       if (!map.has(a.caliber)) map.set(a.caliber, []);
       map.get(a.caliber)!.push(a);
     }
-    // 组内按穿透等级降序
-    for (const list of map.values()) list.sort((x, y) => y.pen_level - x.pen_level || (y.tier ?? 0) - (x.tier ?? 0));
     return [...map.entries()];
   }, [filtered]);
 
@@ -265,14 +218,11 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
   // 抽屉内的适用枪械（含本地图片，无关联时为空数组）
   const selectedWeapons = selected?.weapons ?? [];
 
-  /** 关闭详情抽屉（引用稳定，供 useOverlay 依赖）：同时记录当前参数指纹，避免被 URL 重新顶开 */
+  /** 关闭详情抽屉：同时记录当前参数指纹，避免被 URL 重新顶开 */
   const closeDrawer = useCallback(() => {
     setPicked(null);
     setDismissedKey(paramKey);
   }, [paramKey]);
-
-  // 抽屉无障碍：滚动锁定 + Esc 关闭 + 焦点陷阱 + 关闭后焦点归还（细节见 hooks/useOverlay）
-  const drawerRef = useOverlay<HTMLDivElement>(!!selected, closeDrawer);
 
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-5">
@@ -375,7 +325,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                       className="w-full px-3 py-2.5 text-left transition-colors active:bg-panel-hi/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/50"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="shrink-0" style={{ color: ammoTierColor(a) }}>
+                        <span className="shrink-0" style={{ color: ammoColor(a) }}>
                           <IconAmmo className="h-3.5 w-3.5" />
                         </span>
                         <div className="min-w-0 flex-1">
@@ -400,13 +350,13 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                             <span className="inline-flex items-baseline gap-1">
                               肉体
                               <b className="num text-[12px] font-semibold" style={{ color: dmgColor(a.dmg_ratio) }}>
-                                {Math.round(a.dmg_ratio * 100)}%
+                                {formatPercent(a.dmg_ratio)}
                               </b>
                             </span>
                             <span className="inline-flex items-baseline gap-1 border-l border-edge/70 pl-2.5">
                               护甲
                               <b className="num text-[12px] font-semibold" style={{ color: armorColor(a.armor_ratio) }}>
-                                {Math.round(a.armor_ratio * 100)}%
+                                {formatPercent(a.armor_ratio)}
                               </b>
                             </span>
                             {weaponCount > 0 && <span className="num border-l border-edge/70 pl-2.5">适用 {weaponCount} 把</span>}
@@ -429,7 +379,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
               })}
             </ul>
 
-            {/* 桌面 / 平板：完整宽表 */}
+            {/* 桌面 / 平板：完整宽表（行点击仅为鼠标便利，键盘走首列按钮，保留表格语义） */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm min-w-[900px]">
                 <thead>
@@ -448,26 +398,24 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                     return (
                       <tr
                         key={a.id}
-                        // 行级交互：鼠标点击与键盘 Enter/Space 走同一条路径（移动端条目本身是 button）
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`查看 ${a.name} 弹药详情`}
                         onClick={() => setPicked(a)}
-                        onKeyDown={(e) => {
-                          if (e.key !== 'Enter' && e.key !== ' ') return;
-                          e.preventDefault();
-                          setPicked(a);
-                        }}
-                        className="border-b border-edge/60 last:border-0 cursor-pointer hover:bg-panel-hi/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60"
+                        className="border-b border-edge/60 last:border-0 cursor-pointer hover:bg-panel-hi/60 transition-colors"
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <span className="shrink-0" style={{ color: ammoTierColor(a) }}>
+                            <span className="shrink-0" style={{ color: ammoColor(a) }}>
                               <IconAmmo className="w-4 h-4" />
                             </span>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-medium num">{a.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPicked(a)}
+                                  aria-label={`查看 ${a.name} 弹药详情`}
+                                  className="num text-left font-medium rounded transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+                                >
+                                  {a.name}
+                                </button>
                                 {a.season_limited === 1 && (
                                   <span className="badge !text-danger !border-danger/40" title={a.note || '赛季限定弹药'}>
                                     {seasonTag(a.note) || '赛季'}限定
@@ -517,35 +465,20 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
         {!filtered.length && <p className="text-muted text-sm py-10 text-center">没有符合条件的弹药</p>}
       </div>
 
-      {/* 详情侧滑抽屉：移动端占满视口并避开安全区，桌面为 384px 侧栏 */}
-      {selected && (
-        <div
-          className="fixed inset-0 z-50 bg-[color:var(--overlay)] anim-fade"
-          onClick={closeDrawer}
-        >
-          <div
-            ref={drawerRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${selected.name} 弹药详情`}
-            tabIndex={-1}
-            className="absolute right-0 top-0 h-dvh w-full max-w-full overflow-y-auto bg-panel border-l border-edge p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] anim-slide outline-none [box-shadow:var(--drawer-shadow)] sm:w-96 sm:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-lg font-bold num">{selected.name}</h3>
-                <p className="num text-xs text-muted mt-0.5">
-                  {selected.caliber} · {RARITY_LABEL[selected.rarity] ?? selected.rarity}
-                </p>
-              </div>
-              <button
-                onClick={closeDrawer}
-                aria-label="关闭弹药详情"
-                className="-mr-1.5 -mt-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-2xl leading-none text-muted hover:bg-panel-hi hover:text-accent transition-colors"
-              >
-                ×
-              </button>
+      {/* 详情侧滑抽屉：移动端占满视口并避开安全区，桌面为 384px 侧栏（外壳与动效见 commons/Drawer） */}
+      <Drawer
+        open={!!selected}
+        onClose={closeDrawer}
+        ariaLabel={`${selected?.name ?? '弹药'} 弹药详情`}
+        panelClassName="sm:w-96"
+      >
+        {selected && (
+          <div className="flex-1 overflow-y-auto p-5 pr-12 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 sm:pr-14">
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold num">{selected.name}</h3>
+              <p className="num text-xs text-muted mt-0.5">
+                {selected.caliber} · {RARITY_LABEL[selected.rarity] ?? selected.rarity}
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-5">
@@ -557,17 +490,17 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
               </div>
               <div className="tac-panel tac-panel-plain rounded-lg p-3 text-center">
                 <p className="text-[11px] text-muted">品阶</p>
-                <p className="num text-lg font-bold mt-1" style={{ color: ammoTierColor(selected) }}>
+                <p className="num text-lg font-bold mt-1" style={{ color: ammoColor(selected) }}>
                   {selected.tier ? `${selected.tier} 阶` : '专属弹'}
                 </p>
               </div>
               <div className="tac-panel tac-panel-plain rounded-lg p-3 text-center">
                 <p className="text-[11px] text-muted">肉体伤害倍率</p>
-                <p className="num text-lg font-bold mt-1">{Math.round(selected.dmg_ratio * 100)}%</p>
+                <p className="num text-lg font-bold mt-1">{formatPercent(selected.dmg_ratio)}</p>
               </div>
               <div className="tac-panel tac-panel-plain rounded-lg p-3 text-center">
                 <p className="text-[11px] text-muted">护甲伤害倍率</p>
-                <p className="num text-lg font-bold mt-1">{Math.round(selected.armor_ratio * 100)}%</p>
+                <p className="num text-lg font-bold mt-1">{formatPercent(selected.armor_ratio)}</p>
               </div>
             </div>
 
@@ -602,9 +535,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
 
             <h4 className="text-sm font-bold mt-5 mb-2 flex items-center gap-2">
               适用枪械
-              <span className="num text-[11px] font-normal text-muted">
-                {selectedWeapons.length || (selected.weaponNames?.split('、').filter(Boolean).length ?? 0)} 把
-              </span>
+              <span className="num text-[11px] font-normal text-muted">{splitWeapons(selected.weaponNames).length} 把</span>
               <span className="flex-1 h-px bg-edge" />
             </h4>
             {/* 枪械带官方图，点击可跳转对应图鉴详情 */}
@@ -619,11 +550,12 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                       title={w.name}
                     >
                       <span className="w-12 h-8 shrink-0 flex items-center justify-center">
-                        {w.image ? (
-                          <img src={w.image} alt={w.name} loading="lazy" className="max-w-full max-h-full object-contain" />
-                        ) : (
-                          <IconRifle className="w-5 h-5 text-muted/40" />
-                        )}
+                        <SmartImage
+                          src={w.image}
+                          alt={w.name}
+                          className="max-w-full max-h-full object-contain"
+                          fallback={<IconRifle className="w-5 h-5 text-muted/40" />}
+                        />
                       </span>
                       <span className="text-xs leading-tight truncate">{w.name}</span>
                     </Link>
@@ -646,8 +578,8 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
               枪械基础伤害 × 伤害倍率 = 对枪实际伤害。仅供参考。
             </p>
           </div>
-        </div>
-      )}
+        )}
+      </Drawer>
     </div>
   );
 }

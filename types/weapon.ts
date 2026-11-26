@@ -1,11 +1,11 @@
 /**
- * 武器前端类型定义（图鉴卡片与详情抽屉共用）
+ * 武器类型定义（数据库行 / 前端展示模型 / 统计字段）
  * @author gouxinjie
  * @created 2026-11-25
- * @updated 2026-11-25
+ * @updated 2026-11-26
  */
 
-import type { AmmoEffects } from '@/types/ammo';
+import type { AmmoEffects, AmmoRow } from '@/types/ammo';
 
 /** 武器面板参数（源数据字段可能缺省，缺省时按 '—' 展示） */
 export interface WeaponPanel {
@@ -35,25 +35,43 @@ export interface WeaponPanel {
   fireModes?: string[];
 }
 
-/** 详情抽屉内展示的可用弹药摘要 */
-export interface WeaponAmmoBrief {
-  /** 弹药 itemID */
+/**
+ * 面板中的数值字段键
+ * @description 排除 fireModes（字符串数组），用于进度条 / 最大值统计等数值场景
+ */
+export type WeaponNumericKey = Exclude<keyof WeaponPanel, 'fireModes'>;
+
+/**
+ * 武器数据行（data/delta.db weapons 表，JSON 字段保持字符串原样）
+ * @description 行类型集中定义在此，lib/db 只负责查询
+ */
+export interface WeaponRow {
+  /** 武器 objectID */
   id: string;
-  /** 弹药型号名 */
+  /** 武器名 */
   name: string;
+  /** 类别 */
+  category: string;
   /** 口径 */
   caliber: string;
-  /** 品阶 1-5，专属弹可能为 null */
-  tier: number | null;
-  /** 穿透等级 0-7 */
-  pen_level: number;
-  /** 肉体伤害倍率 */
-  dmg_ratio: number;
-  /** 命中特效（构建期由 effects JSON 解析而来），无特效为空对象 */
-  effects?: AmmoEffects;
-  /** 是否赛季限定（1=是） */
-  season_limited: number;
+  /** 本地图片路径 */
+  image: string;
+  /** 面板 JSON 字符串 */
+  panel: string;
+  /** 可改装槽位 JSON 数组字符串 */
+  slots: string;
+  /** 数据来源标记 */
+  source: string;
 }
+
+/** 详情抽屉内展示的可用弹药摘要（由 AmmoRow 裁剪而来，避免重复声明字段） */
+export type WeaponAmmoBrief = Pick<
+  AmmoRow,
+  'id' | 'name' | 'caliber' | 'tier' | 'rarity' | 'pen_level' | 'dmg_ratio' | 'season_limited'
+> & {
+  /** 命中特效（构建期由 effects JSON 解析而来），无特效为空对象 */
+  effects: AmmoEffects;
+};
 
 /** 武器完整展示模型（图鉴卡片 + 详情抽屉） */
 export interface WeaponDetail {

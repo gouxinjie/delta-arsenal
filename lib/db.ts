@@ -1,5 +1,10 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
+import type { AmmoRow, AmmoWeaponBrief } from '@/types/ammo';
+import type { WeaponRow } from '@/types/weapon';
+
+// 行类型集中定义在 types/，此处转出以保持既有 `@/lib/db` 引用可用
+export type { AmmoRow, AmmoWeaponBrief, WeaponRow };
 
 // 构建期/SSG 直读 SQLite（PRD 6：零运行时数据库依赖）
 const DB_PATH = path.join(process.cwd(), 'data', 'delta.db');
@@ -13,63 +18,6 @@ function db(): Database.Database {
   return _db;
 }
 
-/** 弹药数据行 */
-export interface AmmoRow {
-  /** 弹药 itemID */
-  id: string;
-  /** 型号名 */
-  name: string;
-  /** 口径 */
-  caliber: string;
-  /** 品阶 1-5 */
-  tier: number | null;
-  /** 品阶中文名 */
-  rarity: string;
-  /** 穿透等级 0-7 */
-  pen_level: number;
-  /** 肉体伤害倍率 */
-  dmg_ratio: number;
-  /** 护甲伤害倍率 */
-  armor_ratio: number;
-  /** 穿透矩阵 JSON 字符串 */
-  matrix: string;
-  /** 命中特效 JSON 字符串（燃烧 / 延迟爆裂，无特效为 {}） */
-  effects: string;
-  /** 是否赛季限定 */
-  season_limited: number;
-  /** 弹药备注：限定弹标注赛季，特殊弹标注机制，可为空串 */
-  note: string;
-}
-
-/** 弹药关联武器简要信息（弹药详情抽屉展示枪械缩略图用） */
-export interface AmmoWeaponBrief {
-  /** 武器 objectID（用于跳转 /weapons/[id]） */
-  id: string;
-  /** 武器名 */
-  name: string;
-  /** 本地图片路径，空串表示该枪无官方图 */
-  image: string;
-}
-
-/** 武器数据行 */
-export interface WeaponRow {
-  /** 武器 objectID */
-  id: string;
-  /** 武器名 */
-  name: string;
-  /** 类别 */
-  category: string;
-  /** 口径 */
-  caliber: string;
-  /** 本地图片路径 */
-  image: string;
-  /** 面板 JSON 字符串 */
-  panel: string;
-  /** 可改装槽位 JSON 数组字符串 */
-  slots: string;
-  /** 数据来源标记 */
-  source: string;
-}
 
 /**
  * 读取数据版本元信息
@@ -92,16 +40,17 @@ export function getAllAmmo(): AmmoRow[] {
 
 /**
  * 读取全部弹药并聚合适用枪械名
- * @returns 弹药列表，附 weaponNames（顿号分隔的适用枪械名）
+ * @returns 弹药列表，附 weaponNames（顿号分隔的适用枪械名；无关联枪械时为空串）
  */
 export function getAmmoWithWeapons(): (AmmoRow & { weaponNames: string })[] {
   return db()
     .prepare(
-      `SELECT a.*, GROUP_CONCAT(w.name, '、') AS weaponNames
+      // COALESCE 必须有：无关联枪械时 GROUP_CONCAT 返回 NULL，会让「string」类型变成谎言
+      `SELECT a.*, COALESCE(GROUP_CONCAT(w.name, '、'), '') AS weaponNames
        FROM ammo a
        LEFT JOIN ammo_weapons aw ON aw.ammo_id = a.id
        LEFT JOIN weapons w ON w.id = aw.weapon_id
-       GROUP BY a.id ORDER BY a.caliber, a.pen_level DESC`
+       GROUP BY a.id ORDER BY a.caliber, a.pen_level DESC, a.tier DESC`
     )
     .all() as (AmmoRow & { weaponNames: string })[];
 }
@@ -142,7 +91,7 @@ export function getAllWeapons(): WeaponRow[] {
  * @returns 武器行，不存在返回 null
  */
 export function getWeapon(id: string): WeaponRow | null {
-  return (db().prepare('SELECT * FROM weapons WHERE id = ?').get(id) as WeaponRow) ?? null;
+  return (db().prepare('SELECT * FROM weapons WHERE id = ?').get(id) as WeaponRow | undefined) ?? null;
 }
 
 /**
@@ -173,9 +122,10 @@ export function getAmmoByWeaponMap(): Record<string, AmmoRow[]> {
     .all() as (AmmoRow & { weaponId: string })[];
 
   const map: Record<string, AmmoRow[]> = {};
-  for (const row of rows) {
-    if (!map[row.weaponId]) map[row.weaponId] = [];
-    map[row.weaponId].push(row);
+  for (const { weaponId, ...row } of rows) {
+    if (!map[weaponId]) map[weaponId] = [];
+    // 去掉查询附带的 weaponId：返回对象结构必须与 AmmoRow 一致，避免污染下游数据
+    map[weaponId].push(row);
   }
   return map;
 }

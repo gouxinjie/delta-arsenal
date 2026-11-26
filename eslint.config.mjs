@@ -6,7 +6,7 @@ import nextTs from 'eslint-config-next/typescript';
  * - 继承 Next.js core-web-vitals + TypeScript 规则集
  * - 图片使用 <img> 懒加载（本地缓存 + images.unoptimized），关闭 @next/next/no-img-element
  */
-export default [
+const config = [
   ...nextVitals,
   ...nextTs,
   {
@@ -18,3 +18,5 @@ export default [
     },
   },
 ];
+
+export default config;

@@ -6,6 +6,7 @@
  * @updated 2026-11-25
  */
 
+import { parseJson } from '@/lib/json';
 import type { AmmoEffectSummary, AmmoEffects, BurnEffect, DetonationEffect } from '@/types/ammo';
 
 /** 刷新策略 -> 中文说明 */
@@ -87,11 +88,6 @@ export function describeAmmoEffects(effects?: AmmoEffects | null): AmmoEffectSum
  * @returns 解析后的特效对象，异常时返回空对象
  */
 export function parseAmmoEffects(raw: string | null | undefined): AmmoEffects {
-  if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as AmmoEffects) : {};
-  } catch {
-    return {};
-  }
+  const parsed = parseJson<unknown>(raw, {});
+  return parsed && typeof parsed === 'object' ? (parsed as AmmoEffects) : {};
 }

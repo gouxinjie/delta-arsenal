@@ -2,9 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Header from '@/components/commons/Header';
 import Footer from '@/components/commons/Footer';
-import { getMeta } from '@/lib/db';
+import { getSiteMeta } from '@/lib/site-meta';
 import { SITE_URL, THEME_STORAGE_KEY } from '@/constants/site';
-import type { SiteCounts } from '@/types/site';
 
 /**
  * 视口配置：固定按设备宽度渲染，viewportFit=cover 让固定在底部的抽屉 / 弹层
@@ -47,24 +46,8 @@ export const metadata: Metadata = {
 const THEME_INIT_SCRIPT = `(function(){try{if(localStorage.getItem('${THEME_STORAGE_KEY}')==='light'){document.documentElement.dataset.theme='light';}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  let meta: Record<string, string> = {};
-  // 计数缺省为 null：库缺失时页脚显示「—」，不向用户展示未经证实的数字
-  let counts: SiteCounts = { ammo: null, weapons: null };
-  try {
-    meta = getMeta();
-    if (meta.counts) {
-      const parsed: unknown = JSON.parse(meta.counts);
-      if (parsed && typeof parsed === 'object') {
-        const raw = parsed as { ammo?: unknown; weapons?: unknown };
-        counts = {
-          ammo: typeof raw.ammo === 'number' ? raw.ammo : null,
-          weapons: typeof raw.weapons === 'number' ? raw.weapons : null,
-        };
-      }
-    }
-  } catch {
-    // 数据库缺失时页面仍可渲染骨架
-  }
+  // 元信息解析与计数兜底集中在 lib/site-meta（首页 / 页脚共用同一口径），缺库时降级为骨架
+  const siteMeta = getSiteMeta();
   return (
     <html lang="zh-CN" data-theme="dark" suppressHydrationWarning>
       <head>
@@ -73,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen flex flex-col bg-bg text-main">
         <Header />
         <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 py-4">{children}</main>
-        <Footer meta={meta} counts={counts} />
+        <Footer siteMeta={siteMeta} />
       </body>
     </html>
   );

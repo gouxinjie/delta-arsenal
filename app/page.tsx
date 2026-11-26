@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { getMeta } from '@/lib/db';
+import { getSiteMeta } from '@/lib/site-meta';
+import { formatCount } from '@/lib/format';
 import { IconChart, IconAmmo, IconBook, IconUnknown } from '@/components/commons/icons';
-import type { SiteCounts } from '@/types/site';
 
 /**
  * @page Home
@@ -54,15 +54,6 @@ function CardShell({ href, className, children }: { href?: string; className: st
       {children}
     </Link>
   );
-}
-
-/**
- * 数量展示：数据库缺失时显示「—」，不展示未经证实的数字
- * @param value - 计数值或 null
- * @returns 展示文本
- */
-function showNum(value: number | null): string {
-  return value === null ? '—' : String(value);
 }
 
 /** 数据来源展示项 */
@@ -342,32 +333,8 @@ function MatrixPreview() {
 }
 
 export default function Home() {
-  // 计数缺省为 null：数据库缺失时展示「—」，不用写死的数字假装有数据
-  let counts: SiteCounts = { ammo: null, weapons: null };
-  let season = '—';
-  let datasetVersion = '';
-  let updated = '—';
-  let sourcesRaw = '';
-  try {
-    const meta = getMeta();
-    if (meta.counts) {
-      const parsed: unknown = JSON.parse(meta.counts);
-      if (parsed && typeof parsed === 'object') {
-        const raw = parsed as { ammo?: unknown; weapons?: unknown };
-        counts = {
-          ammo: typeof raw.ammo === 'number' ? raw.ammo : null,
-          weapons: typeof raw.weapons === 'number' ? raw.weapons : null,
-        };
-      }
-    }
-    season = meta.season ?? '—';
-    // 上游数据集版本（如 20261105-weiguang.1），用于判断本站数据是否落后于当前赛季
-    datasetVersion = meta.datasetVersion && meta.datasetVersion !== 'unknown' ? meta.datasetVersion : '';
-    updated = meta.generatedAt ? new Date(meta.generatedAt).toLocaleDateString('zh-CN') : '—';
-    sourcesRaw = meta.sources ?? '';
-  } catch {
-    // 数据库缺失时渲染骨架，数值位显示「—」
-  }
+  // 元信息解析 / 计数与日期兜底集中在 lib/site-meta（与页脚共用），数据库缺失时各字段显示「—」
+  const { counts, season, datasetVersion, updatedAt, sourcesRaw } = getSiteMeta();
 
   const sources = parseSources(sourcesRaw);
 
@@ -386,8 +353,8 @@ export default function Home() {
       href: '/ammo',
       tag: 'AMMO',
       title: '弹药库',
-      desc: `全口径 ${showNum(counts.ammo)} 种弹药：穿透等级、伤害比例、适用枪械。`,
-      short: `全口径 ${showNum(counts.ammo)} 种弹药的穿透与伤害`,
+      desc: `全口径 ${formatCount(counts.ammo)} 种弹药：穿透等级、伤害比例、适用枪械。`,
+      short: `全口径 ${formatCount(counts.ammo)} 种弹药的穿透与伤害`,
       icon: <IconAmmo className="h-5 w-5 sm:h-7 sm:w-7" />,
       span: '',
     },
@@ -395,8 +362,8 @@ export default function Home() {
       href: '/weapons',
       tag: 'ARMS',
       title: '武器图鉴',
-      desc: `收录 ${showNum(counts.weapons)} 把枪械：面板、口径、可改装槽位。`,
-      short: `${showNum(counts.weapons)} 把枪械的面板与改装数据`,
+      desc: `收录 ${formatCount(counts.weapons)} 把枪械：面板、口径、可改装槽位。`,
+      short: `${formatCount(counts.weapons)} 把枪械的面板与改装数据`,
       icon: <IconBook className="h-5 w-5 sm:h-7 sm:w-7" />,
       span: '',
     },
@@ -468,15 +435,15 @@ export default function Home() {
           <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 sm:mt-8 sm:flex sm:flex-wrap sm:items-end sm:gap-x-10 sm:gap-y-5">
             <div className="border-l border-accent/30 pl-3">
               <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">弹药 AMMO</dt>
-              <dd className="num mt-1 text-2xl font-bold leading-none text-accent">{showNum(counts.ammo)}</dd>
+              <dd className="num mt-1 text-2xl font-bold leading-none text-accent">{formatCount(counts.ammo)}</dd>
             </div>
             <div className="border-l border-info/30 pl-3">
               <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">枪械 ARMS</dt>
-              <dd className="num mt-1 text-2xl font-bold leading-none text-info">{showNum(counts.weapons)}</dd>
+              <dd className="num mt-1 text-2xl font-bold leading-none text-info">{formatCount(counts.weapons)}</dd>
             </div>
             <div className="border-l border-edge pl-3">
               <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">数据更新</dt>
-              <dd className="num mt-1 text-xl font-bold leading-none text-main">{updated}</dd>
+              <dd className="num mt-1 text-xl font-bold leading-none text-main">{updatedAt}</dd>
             </div>
             <div className="border-l border-edge pl-3">
               <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">数据集 DATASET</dt>

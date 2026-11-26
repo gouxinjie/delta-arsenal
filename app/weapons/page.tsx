@@ -1,35 +1,19 @@
-import { getAllWeapons, getAmmoByWeaponMap } from '@/lib/db';
-import { parseAmmoEffects } from '@/lib/ammo-effects';
+import { getAmmoByWeaponMap, getAllWeapons } from '@/lib/db';
+import { toWeaponDetail } from '@/lib/view';
 import WeaponBrowser from '@/components/commons/WeaponBrowser';
 import PageHero from '@/components/commons/PageHero';
 import { IconBook } from '@/components/commons/icons';
-import type { WeaponDetail, WeaponPanel } from '@/types/weapon';
+import type { WeaponDetail } from '@/types/weapon';
 
 export const metadata = { title: '武器图鉴' };
 
 export default function WeaponsPage() {
   // 构建期一次性取全量关联（单条 JOIN），再在内存按武器分组，避免逐把武器查询的 N+1
   const ammoByWeapon = getAmmoByWeaponMap();
-  // 组装卡片 + 抽屉所需的完整数据，运行时零额外请求
-  const weapons: WeaponDetail[] = getAllWeapons().map((w) => ({
-    id: w.id,
-    name: w.name,
-    category: w.category,
-    caliber: w.caliber,
-    image: w.image,
-    panel: JSON.parse(w.panel || '{}') as WeaponPanel,
-    slots: JSON.parse(w.slots || '[]') as string[],
-    ammo: (ammoByWeapon[w.id] ?? []).map((a) => ({
-      id: a.id,
-      name: a.name,
-      caliber: a.caliber,
-      tier: a.tier,
-      pen_level: a.pen_level,
-      dmg_ratio: a.dmg_ratio,
-      effects: parseAmmoEffects(a.effects),
-      season_limited: a.season_limited,
-    })),
-  }));
+  // 面板 / 槽位 JSON 解析与弹药裁剪统一走 toWeaponDetail
+  const weapons: WeaponDetail[] = getAllWeapons().map((w) =>
+    toWeaponDetail(w, ammoByWeapon[w.id] ?? [])
+  );
 
   return (
     <div>

@@ -41,6 +41,7 @@ const MAX_RESULTS = 12;
 
 /**
  * 解析 /search-index.json，缺字段的脏数据直接丢弃（索引由本地脚本生成，仍需防御）
+ * @description caliber 必须校验：搜索匹配时会对它调用 toLowerCase，缺失会让整个弹窗抛错
  * @param raw - fetch 拿到的原始 JSON
  * @returns 扁平化的索引条目数组
  */
@@ -55,7 +56,8 @@ function normalizeIndex(raw: unknown): SearchItem[] {
             typeof item === 'object' &&
             (item as SearchItem).type === type &&
             typeof (item as SearchItem).id === 'string' &&
-            typeof (item as SearchItem).name === 'string'
+            typeof (item as SearchItem).name === 'string' &&
+            typeof (item as SearchItem).caliber === 'string'
         )
       : [];
   return [...pick(weapons, 'weapon'), ...pick(ammo, 'ammo')];

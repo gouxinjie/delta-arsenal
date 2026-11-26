@@ -1,93 +1,15 @@
 import type { ReactNode } from 'react';
 import { getAllAmmo } from '@/lib/db';
+import { parseJson } from '@/lib/json';
+import { ARMOR_LEVELS, cellTitle, isSpecialAmmo, judge } from '@/lib/penetration';
 import PageHero from '@/components/commons/PageHero';
 import { IconAmmo, IconChart, IconCheck, IconCross, IconShield, IconWarn } from '@/components/commons/icons';
-import { RARITY_LABEL, tierColor } from '@/constants/game';
+import { RARITY_LABEL, ammoColor, isExclusiveAmmo } from '@/constants/game';
+import type { AmmoRow, PenetrationMatrix } from '@/types/ammo';
 
 export const metadata = { title: '穿甲对照矩阵' };
 
-const ARMOR_LEVELS = [1, 2, 3, 4, 5, 6];
-
-interface MatrixCell {
-  body_health_rate?: number;
-  helmet_health_rate?: number;
-  penetrates?: boolean;
-}
-
-/** 判定档位：none 表示该护甲等级源数据缺失（与「打不穿」区分开） */
-type Tone = 'ok' | 'warn' | 'bad' | 'none';
-
-/**
- * 判定单元格样式与字形标记
- * 单元格用字形（✓ / ! / ✕）而不是内联 SVG：矩阵页有 100+ 行 × 6 列，逐格 SVG 会把静态 HTML 撑到 MB 级；
- * 也不用 Emoji：跨平台字形差异大，读屏会把「✅」念成符号名而丢失判定语义
- */
-const CELL_STYLES: Record<Tone, { glyph: string; fg: string; bg: string; desc: string }> = {
-  ok: { glyph: '✓', fg: 'var(--t2)', bg: 'var(--ok-bg)', desc: '全额穿透' },
-  warn: { glyph: '!', fg: 'var(--t5)', bg: 'var(--warn-bg)', desc: '可穿但衰减' },
-  bad: { glyph: '✕', fg: 'var(--danger)', bg: 'var(--bad-bg)', desc: '打不穿' },
-  none: { glyph: '—', fg: 'var(--muted)', bg: 'transparent', desc: '暂无实测数据' },
-};
-
-/**
- * 按肉体伤害保留比例归入三档：绿=全额穿透，黄=可穿但有衰减，红=无肉体伤害
- * 与图例四档（100/75/50/0）对应，仅 100% 显示绿色，避免 90% 等特殊值被误判为高效穿透
- * @param rate 保留比例（0~1）
- * @returns 判定档位
- */
-function toneOf(rate: number): Exclude<Tone, 'none'> {
-  if (rate <= 0) return 'bad';
-  return rate >= 1 ? 'ok' : 'warn';
-}
-
-/**
- * 判定单元格展示档位与数值
- * @param cell 矩阵单元格，undefined 表示该护甲等级无实测数据
- * @returns 档位样式、百分比数值（无数据为 null）与判定说明
- */
-function judge(cell: MatrixCell | undefined) {
-  // 缺数据必须与「打不穿」区分：源数据偶有护甲等级未覆盖，渲染成 0% 会变成错误结论
-  if (!cell || (cell.body_health_rate === undefined && cell.penetrates === undefined)) {
-    return { ...CELL_STYLES.none, rate: null };
-  }
-  // penetrates=false 时源数据仍可能带 body_health_rate（如 45-70 的 RN 对 1 级甲为 1），
-  // 必须强制归零，否则会渲染出自相矛盾的「打不穿 100%」
-  const rate = cell.penetrates === false ? 0 : Math.round((cell.body_health_rate ?? 0) * 100);
-  return { ...CELL_STYLES[toneOf(rate / 100)], rate };
-}
-
-/**
- * 单元格提示文案：把「无数据 / 打不穿 / 保留比例」三种情况分开描述（同时用于 title 与 aria-label）
- * @param judged - judge() 的返回值
- * @returns 提示文本
- */
-function cellTitle(judged: { rate: number | null; desc: string }): string {
-  if (judged.rate === null) return judged.desc;
-  return judged.rate > 0 ? `身体伤害保留 ${judged.rate}%` : '无法穿透，仅消耗护甲耐久';
-}
-
-/**
- * 判断弹药是否偏离「常规四档」穿透规则
- * 源数据中箭矢、龙息、特效弹等存在非标准衰减（如打高甲仍保留 10%~14%），
- * 需单独标记，避免用户把图例当作普适结论
- * @param matrix 穿透矩阵
- * @param penLevel 弹穿等级
- * @returns 是否特殊机制
- */
-function isSpecialAmmo(matrix: Record<string, MatrixCell>, penLevel: number): boolean {
-  return ARMOR_LEVELS.some((lv) => {
-    const cell = matrix[String(lv)];
-    if (!cell) return false;
-    const gap = penLevel - lv;
-    const expected = gap >= 2 ? 1 : gap === 1 ? 0.75 : gap === 0 ? 0.5 : 0;
-    // 用 judge 的展示口径（penetrates=false 归零、百分比取整、缺数据不计入）与四档数值比对：
-    // 口径统一后，RN 这类「源数据声明未穿透但残留伤害」的弹不会仅因原始字段矛盾被误标
-    const actual = judge(cell).rate;
-    return actual !== null && actual !== expected * 100;
-  });
-}
-
-// 图例中的穿透判定四档（与 judge() 阈值保持一致，改规则时两处同步）
+// 图例中的穿透判定四档（与 lib/penetration 的 judge() 阈值保持一致，改规则时两处同步）
 const PEN_RULES: { label: string; rate: string; icon: ReactNode; tone: string }[] = [
   { label: '高 2 级以上', rate: '100%', icon: <IconCheck className="h-3.5 w-3.5" />, tone: 'text-t2' },
   { label: '高 1 级', rate: '75%', icon: <IconWarn className="h-3.5 w-3.5" />, tone: 'text-t5' },
@@ -98,11 +20,9 @@ const PEN_RULES: { label: string; rate: string; icon: ReactNode; tone: string }[
 /** 弹药标识入参（只取展示所需字段，便于表格与卡片复用） */
 interface AmmoLabelProps {
   /** 弹药基础信息 */
-  ammo: { name: string; caliber: string; rarity: string; tier: number | null; pen_level: number };
-  /** 品阶色（专属弹为危险色） */
+  ammo: Pick<AmmoRow, 'name' | 'caliber' | 'rarity' | 'tier' | 'pen_level'>;
+  /** 品阶色（专属弹为危险色，由 ammoColor 统一计算） */
   color: string;
-  /** 是否专属弹（穿 6/7 或红品阶） */
-  exclusive: boolean;
   /** 判定是否偏离常规四档 */
   special: boolean;
 }
@@ -112,7 +32,8 @@ interface AmmoLabelProps {
  * 桌面表格首列与移动端卡片共用，保证两套布局信息一致
  * @param props - 弹药与配色信息
  */
-function AmmoLabel({ ammo, color, exclusive, special }: AmmoLabelProps) {
+function AmmoLabel({ ammo, color, special }: AmmoLabelProps) {
+  const exclusive = isExclusiveAmmo(ammo);
   const tierLabel = exclusive ? '专属弹' : `${ammo.tier ?? '?'} 阶（${ammo.rarity ?? '—'}）`;
   return (
     <>
@@ -150,22 +71,17 @@ function AmmoLabel({ ammo, color, exclusive, special }: AmmoLabelProps) {
 }
 
 export default function MatrixPage() {
-  // 排序（第一版）：全局按穿透等级从高到低，同等级按口径字母序
-  const sorted = getAllAmmo()
-    .map((a) => ({ ...a, m: JSON.parse(a.matrix || '{}') as Record<string, MatrixCell> }))
-    .filter((a) => Object.keys(a.m).length > 0)
-    .sort((x, y) => y.pen_level - x.pen_level || x.caliber.localeCompare(y.caliber));
-
-  // 预先算好品阶色 / 专属标记 / 特殊机制，避免表格与移动端卡片各算一遍
-  const rows = sorted.map((a) => {
-    const isExclusive = a.pen_level >= 6 || a.rarity === '红';
-    return {
+  // 排序：全局按穿透等级从高到低，同等级按口径字母序；矩阵字段损坏时按空对象处理（该行不展示）
+  const rows = getAllAmmo()
+    .map((a) => ({ ...a, matrix: parseJson<PenetrationMatrix>(a.matrix, {}) }))
+    .filter((a) => Object.keys(a.matrix).length > 0)
+    .sort((x, y) => y.pen_level - x.pen_level || x.caliber.localeCompare(y.caliber))
+    // 预先算好品阶色与特殊机制，避免表格与移动端卡片各算一遍
+    .map((a) => ({
       ...a,
-      isExclusive,
-      tierVar: isExclusive ? 'var(--danger)' : tierColor(a.tier),
-      special: isSpecialAmmo(a.m, a.pen_level),
-    };
-  });
+      color: ammoColor(a),
+      special: isSpecialAmmo(a.matrix, a.pen_level),
+    }));
 
   return (
     <div>
@@ -285,12 +201,12 @@ export default function MatrixPage() {
               >
                 <td
                   className="col-span-3 md:col-span-1 md:table-cell md:sticky md:left-0 md:z-10 md:bg-bg md:px-3 md:py-2.5"
-                  style={{ boxShadow: `inset 3px 0 0 ${a.tierVar}` }}
+                  style={{ boxShadow: `inset 3px 0 0 ${a.color}` }}
                 >
-                  <AmmoLabel ammo={a} color={a.tierVar} exclusive={a.isExclusive} special={a.special} />
+                  <AmmoLabel ammo={a} color={a.color} special={a.special} />
                 </td>
                 {ARMOR_LEVELS.map((lv) => {
-                  const j = judge(a.m[String(lv)]);
+                  const j = judge(a.matrix[String(lv)]);
                   return (
                     <td
                       key={lv}

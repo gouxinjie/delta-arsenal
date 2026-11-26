@@ -3,7 +3,7 @@
  * @description 武器图鉴浏览器：按类型 Tab（带图标 + 计数）筛选，卡片网格展示，点击卡片从右侧弹出详情抽屉（不跳页）
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-25
+ * @updated 2026-11-26
  */
 'use client';
 
@@ -20,49 +20,13 @@ import {
   IconPistol,
   IconUnknown,
 } from '@/components/commons/icons';
+import SmartImage from '@/components/commons/SmartImage';
 import WeaponDrawer from '@/components/commons/WeaponDrawer';
-import type { WeaponDetail, WeaponPanel } from '@/types/weapon';
+import { WEAPON_BAR_STAT_KEYS, WEAPON_CARD_STAT_KEYS, WEAPON_STAT_META } from '@/constants/weapon';
+import type { WeaponDetail, WeaponNumericKey } from '@/types/weapon';
 
 /** 图片偏小的分类：短枪身高宽比接近方形，在宽幅图区里会被撑满高度显得过大，单独缩放 */
 const COMPACT_IMG_CATEGORIES = new Set(['手枪']);
-
-/**
- * 卡片武器图：无图或加载失败时显示枪械剪影占位（配合数据源图片缺失场景）
- * @param props.src - 图片地址，空值直接走占位剪影
- * @param props.alt - 图片替代文本（武器名）
- * @param props.compact - 是否缩小展示（短枪身武器用，默认 false）
- */
-function WeaponImage({ src, alt, compact = false }: { src: string; alt: string; compact?: boolean }) {
-  const [err, setErr] = useState(!src);
-  if (err) {
-    return (
-      <span className="flex items-center justify-center text-muted/30">
-        <IconRifle className="w-12 h-12" />
-      </span>
-    );
-  }
-  return (
-    <img
-      src={src}
-      alt={alt}
-      loading="lazy"
-      className={`weapon-img max-w-full object-contain opacity-90 ${compact ? 'max-h-[68%]' : 'max-h-full'}`}
-      onError={() => setErr(true)}
-    />
-  );
-}
-
-/** 卡片参数栏配置：8 项等宽平铺（对齐参考图排版） */
-const CARD_STATS: { key: keyof WeaponPanel; label: string }[] = [
-  { key: 'meatHarm', label: '肉伤' },
-  { key: 'armorHarm', label: '甲伤' },
-  { key: 'fireRate', label: '射速' },
-  { key: 'effectiveRange', label: '射程' },
-  { key: 'recoil', label: '后座' },
-  { key: 'control', label: '操控' },
-  { key: 'stability', label: '稳定' },
-  { key: 'hipFire', label: '腰射' },
-];
 
 /** 分类 Tab 配置：标签 + 图标（图标按当前色继承） */
 const TABS: { label: string; icon: (cls: string) => React.ReactNode }[] = [
@@ -97,11 +61,12 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
     [weapons, tab]
   );
 
-  /** 各面板数值字段在全库中的最大值，供抽屉进度条等比换算 */
+  /** 抽屉进度条用到的字段在全库中的最大值（只统计进度条实际展示的字段） */
   const statMax = useMemo(() => {
-    const max: Record<string, number> = {};
+    const max: Partial<Record<WeaponNumericKey, number>> = {};
     for (const w of weapons) {
-      for (const [key, value] of Object.entries(w.panel)) {
+      for (const key of WEAPON_BAR_STAT_KEYS) {
+        const value = w.panel[key];
         if (typeof value === 'number') max[key] = Math.max(max[key] ?? 0, value);
       }
     }
@@ -178,15 +143,26 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
 
               {/* 图片区：扁平宽幅 + 暗底径向渐变，枪械图不压过文字信息 */}
               <div className="thumb-bg relative aspect-[7/2] flex items-center justify-center overflow-hidden bg-bg px-5">
-                <WeaponImage src={w.image} alt={w.name} compact={COMPACT_IMG_CATEGORIES.has(w.category)} />
+                <SmartImage
+                  src={w.image}
+                  alt={w.name}
+                  className={`weapon-img max-w-full object-contain opacity-90 ${
+                    COMPACT_IMG_CATEGORIES.has(w.category) ? 'max-h-[68%]' : 'max-h-full'
+                  }`}
+                  fallback={
+                    <span className="flex items-center justify-center text-muted/30">
+                      <IconRifle className="w-12 h-12" />
+                    </span>
+                  }
+                />
               </div>
 
               {/* 参数栏：桌面 8 项一行，窄屏拆成 4 列 × 2 行，避免数字挤成一团 */}
               <div className="num grid grid-cols-4 gap-x-1 gap-y-2 px-2.5 py-2 border-t border-edge/60 sm:grid-cols-8 sm:gap-y-0">
-                {CARD_STATS.map((s) => (
-                  <div key={s.key} className="flex flex-col items-center gap-0.5 min-w-0">
-                    <span className="text-[10px] text-muted whitespace-nowrap">{s.label}</span>
-                    <b className="text-[13px] font-semibold text-main">{w.panel[s.key] ?? '—'}</b>
+                {WEAPON_CARD_STAT_KEYS.map((key) => (
+                  <div key={key} className="flex flex-col items-center gap-0.5 min-w-0">
+                    <span className="text-[10px] text-muted whitespace-nowrap">{WEAPON_STAT_META[key].short}</span>
+                    <b className="text-[13px] font-semibold text-main">{w.panel[key] ?? '—'}</b>
                   </div>
                 ))}
               </div>
