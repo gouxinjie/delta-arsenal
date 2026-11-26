@@ -1,33 +1,68 @@
 /**
- * 游戏中常量映射（口径贴图 / 改装配件槽位名）
+ * 游戏中常量映射（口径贴图 / 品阶配色 / 改装配件槽位名）
+ * 说明：口径图标文件名真源为同为 constants 目录的 caliber-icons.json，sync 脚本共用同一份数据，
+ *       新增口径只需补一行 JSON，避免前端与脚本两份映射漂移。
  * @author gouxinjie
  * @created 2026-11-25
- * @updated 2026-11-25
+ * @updated 2026-11-26
  */
 
+import CALIBER_ICON_FILES from '@/constants/caliber-icons.json';
+
 /** 口径 -> 本地弹药贴图路径（playerhub 官方贴图，按口径区分） */
-export const CALIBER_ICON: Record<string, string> = {
-  '.300BLK': '/img/ammo/300BLK.png',
-  '.338 Lap Mag': '/img/ammo/338.png',
-  '.357 Magnum': '/img/ammo/357.png',
-  '.45ACP': '/img/ammo/45-ACP.png',
-  '.50AE': '/img/ammo/50-AE.png',
-  '12.7x55': '/img/ammo/12.7x55.png',
-  '12Gauge': '/img/ammo/12-Gauge.png',
-  '4.6x30mm': '/img/ammo/4.6x30mm.png',
-  '5.45x39mm': '/img/ammo/5.45x39mm.png',
-  '5.56x45mm': '/img/ammo/5.56x45mm.png',
-  '5.7x28mm': '/img/ammo/5.7x28mm.png',
-  '5.8x42mm': '/img/ammo/5.8x42mm.png',
-  '6.8x51mm': '/img/ammo/6.8x51mm.png',
-  '7.62x39mm': '/img/ammo/7.62x39mm.png',
-  '7.62x51mm': '/img/ammo/7.62x51mm.png',
-  '7.62x54R': '/img/ammo/7.62x54mm.png',
-  '9x19mm': '/img/ammo/9x19mm.png',
-  '9x39mm': '/img/ammo/9x39mm.png',
+export const CALIBER_ICON: Record<string, string> = Object.fromEntries(
+  Object.entries(CALIBER_ICON_FILES as Record<string, string>).map(([caliber, file]) => [
+    caliber,
+    `/img/ammo/${file}.png`,
+  ])
+);
+
+/** 品阶主题色变量，索引 = 品阶 - 1（红品阶 / 穿 6 起为专属弹，单独取 --danger）；对外请用 tierColor() */
+const TIER_COLORS = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'] as const;
+
+/** 品阶 Tailwind 文字色类，索引 = 品阶 - 1，与 TIER_COLORS 一一对应；对外请用 tierTextClass() */
+const TIER_TEXT_CLASS = ['text-t1', 'text-t2', 'text-t3', 'text-t4', 'text-t5'] as const;
+
+/** 品阶原始名 -> 展示标签（橙 / 金同属金色品阶） */
+export const RARITY_LABEL: Record<string, string> = {
+  白: '白弹',
+  绿: '绿弹',
+  蓝: '蓝弹',
+  紫: '紫弹',
+  橙: '金弹',
+  金: '金弹',
+  红: '专属弹',
 };
 
-/** 弹药命中特效 -> 徽章配色（燃烧金橙 / 爆裂红），AmmoBrowser 与武器详情共用 */
+/**
+ * 品阶取值归一：越界 / 缺省（专属弹 tier 为 null）时回退到白弹，避免下标 -1 取到 undefined
+ * @param tier - 品阶 1-5
+ * @returns 归一后的索引（0-4）
+ */
+function tierIndex(tier: number | null | undefined): number {
+  if (!tier || tier < 1) return 0;
+  return Math.min(tier, TIER_COLORS.length) - 1;
+}
+
+/**
+ * 品阶 -> 主题色变量
+ * @param tier - 品阶 1-5，null 表示专属弹
+ * @returns CSS 颜色值
+ */
+export function tierColor(tier: number | null | undefined): string {
+  return TIER_COLORS[tierIndex(tier)];
+}
+
+/**
+ * 品阶 -> Tailwind 文字色类名
+ * @param tier - 品阶 1-5，null 表示专属弹
+ * @returns 类名，如 text-t3
+ */
+export function tierTextClass(tier: number | null | undefined): string {
+  return TIER_TEXT_CLASS[tierIndex(tier)];
+}
+
+/** 弹药命中特效 -> 徽章配色（燃烧金橙 / 爆裂红），弹药库与武器详情共用 */
 export const AMMO_EFFECT_TONE: Record<'burn' | 'detonation', string> = {
   burn: 'var(--t5)',
   detonation: 'var(--danger)',

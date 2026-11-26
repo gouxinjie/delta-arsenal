@@ -9,13 +9,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AMMO_EFFECT_TONE, CALIBER_ICON, SLOT_NAMES } from '@/constants/game';
+import { AMMO_EFFECT_TONE, CALIBER_ICON, SLOT_NAMES, tierColor } from '@/constants/game';
 import { describeAmmoEffects } from '@/lib/ammo-effects';
 import { IconAmmo, IconRifle } from '@/components/commons/icons';
+import { useOverlay } from '@/hooks/useOverlay';
 import type { WeaponDetail, WeaponPanel } from '@/types/weapon';
-
-/** 品阶文字/描边颜色（白绿蓝紫金） */
-const TIER_COLOR = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
 
 /** 抽屉进入 / 退场过渡时长（毫秒）：抽屉位移、遮罩淡出与卸载定时器共用，避免三者不同步 */
 const DRAWER_ANIM_MS = 300;
@@ -55,11 +53,6 @@ function SectionTitle({ title, count }: { title: string; count?: number }) {
   );
 }
 
-/** 品阶色（tier 缺省时回退白色） */
-function tierColor(tier: number | null): string {
-  return tier ? TIER_COLOR[tier - 1] : 'var(--t1)';
-}
-
 /**
  * 弹药磁贴：口径贴图 + 型号名 + 穿透等级，点击跳转弹药库检索
  * 有命中特效（燃烧 / 爆裂）时，右上角叠加一枚迷你标签，悬浮可看完整参数
@@ -73,7 +66,7 @@ function AmmoTile({ ammo, onClose }: { ammo: WeaponDetail['ammo'][number]; onClo
   const effectText = effects.map((e) => e.detail).join(' ');
   return (
     <Link
-      href={`/ammo?q=${encodeURIComponent(ammo.name)}`}
+      href={`/ammo?ammo=${ammo.id}`}
       onClick={onClose}
       title={`${ammo.name} · 穿透 ${ammo.pen_level} 级 · 肉伤 ${Math.round(ammo.dmg_ratio * 100)}%${effectText ? ` · ${effectText}` : ''}`}
       className="relative flex flex-col items-center gap-1 pt-2 pb-1.5 px-1.5 rounded border bg-bg/60 overflow-hidden"
@@ -146,27 +139,8 @@ export default function WeaponDrawer({ weapon: incomingWeapon, statMax, onClose 
     };
   }, [incomingWeapon]);
 
-  // 打开时锁定页面滚动 + 支持 Esc 关闭（退场动画期间仍保持锁定，卸载时恢复）
-  useEffect(() => {
-    if (!shown) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-
-    // 锁定滚动会让滚动条消失、可用宽度增加，需补偿同等宽度，避免页面内容横向抖动
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    const prevOverflow = document.body.style.overflow;
-    const prevPaddingRight = document.body.style.paddingRight;
-    document.body.style.overflow = 'hidden';
-    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
-
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = prevOverflow;
-      document.body.style.paddingRight = prevPaddingRight;
-    };
-  }, [shown, onClose]);
+  // 打开时锁定页面滚动 + Esc 关闭 + 焦点陷阱（退场动画期间仍保持锁定，卸载时恢复）
+  const drawerRef = useOverlay<HTMLElement>(!!shown, onClose);
 
   if (!shown) return null;
 
@@ -197,10 +171,12 @@ export default function WeaponDrawer({ weapon: incomingWeapon, statMax, onClose 
 
       {/* 抽屉主体：右侧滑入，关闭时原路滑出（位移用内联 transform，避免不同版本 translate 工具类口径差异） */}
       <aside
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
         aria-label={`${weapon.name} 详情`}
         aria-hidden={!open}
+        tabIndex={-1}
         style={{
           transform: open ? 'translateX(0)' : 'translateX(100%)',
           transition: `transform ${DRAWER_ANIM_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`,
@@ -347,6 +323,16 @@ export default function WeaponDrawer({ weapon: incomingWeapon, statMax, onClose 
               <p className="text-xs text-muted">暂无槽位数据（补充源枪械）</p>
             )}
           </section>
+
+          {/* 卡片点击与键盘激活都打开弹层，详情页成了「只有改地址才能进」；
+              这里给出显式入口，保证详情页有可用路径（弹层内容仅客户端渲染，仅服务键盘/鼠标可达性） */}
+          <Link
+            href={`/weapons/${weapon.id}`}
+            onClick={onClose}
+            className="block rounded border border-edge py-2 text-center text-xs text-muted transition-colors hover:border-accent hover:text-accent"
+          >
+            查看完整详情页 →
+          </Link>
 
           {/* 免责声明：与正文拉开层级，弱化到次要文字色 */}
           <p className="text-[11px] text-muted/80 leading-relaxed border-t border-edge/60 pt-3">

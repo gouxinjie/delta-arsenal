@@ -31,9 +31,19 @@ pnpm run dev
 
 # 4. 构建 SSG
 pnpm run build
+
+# 5. 类型检查（CI 建议串联）
+pnpm run typecheck
 ```
 
-> 环境要求：Node ≥ 22（`scripts/sync.mjs` 无框架依赖，可直接运行；better-sqlite3 原生模块按 Node 22 ABI 编译，Node 20 运行会直接崩溃）。
+> 环境要求：**Node ≥ 22**（仓库根目录 `.node-version` 已声明精确版本，`fnm use` / `asdf` 会自动切换；nvm 用户请手动 `nvm use 22`）。
+> `scripts/sync.mjs` 无框架依赖，可直接运行；better-sqlite3 通过 N-API 预编译产物运行，无需本地编译。
+
+## 环境变量
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `NEXT_PUBLIC_SITE_URL` | 生产必填 | 站点根地址（如 `https://example.com`），用于 canonical / OpenGraph / `sitemap.xml` / `robots.txt` 的绝对 URL；缺省回退 `http://localhost:3000` |
 
 ## 数据链路
 
@@ -44,7 +54,7 @@ pnpm run build
 | 弹药全字段 | `AVA-2568/delta-gun-tierlist@main`（jsDelivr） | 含 `penetration_matrix`，矩阵页数据现成 |
 | 枪械面板 + 官方图 | `jiansenc/DeltaForceData@main`（jsDelivr） | `ammo[].objectID` 建立弹药 ↔ 武器关联 |
 | 武器补充 | npm 包 `delta-force-core`（本地） | 按名称补 DFD 缺失枪械 |
-| 图片 | `playerhub.df.qq.com`（腾讯 CDN） | 构建期下载至 `/public/img/`，禁止热链 |
+| 图片 | `playerhub.df.qq.com`（腾讯 CDN） | 构建期下载至 `public/img/weapons`（武器图）与 `public/img/ammo`（口径贴图），禁止热链 |
 
 - `data/delta.db` 为入库真源，**不要手改**，重建走 `pnpm run sync`。
 - `tmp/*_cache.json` 为拉取失败时的本地回退缓存，sync 失败优先检查缓存新鲜度。
@@ -54,17 +64,20 @@ pnpm run build
 ```
 app/                  Next.js 路由
 components/commons/   公共组件（每组件独立文件夹 + index.tsx）
+hooks/                通用前端行为 Hook（useOverlay：滚动锁定 / Esc / 焦点陷阱）
+constants/            游戏常量与站点常量（含口径图标真源 caliber-icons.json）
 lib/                  数据库读取层（db.ts）
 scripts/              sync.mjs 等脚本
 data/                 delta.db（入库，生成物）
-public/img/           构建期下载的武器图片
+public/img/weapons/   构建期下载的武器图
+public/img/ammo/      构建期下载的口径贴图
 public/search-index.json  前端搜索索引（sync 生成）
 tmp/                  抓取缓存（gitignore）
 ```
 
 ## 约定
 
-- 主题色 token：底 `#12141A` / 面板 `#1B1F29` / 强调橙 `#FF9E2C`，组件统一走 CSS 变量。
+- 主题色 token 以 `app/globals.css` 为唯一事实源（暗色主题：底 `#0a0f15` / 面板 `#101922` / 强调青绿 `#2fe3a4`；浅色主题见同文件 `[data-theme="light"]`），组件统一走 CSS 变量，不散落硬编码。
 - 数字、口径一律等宽字体。
 - 页面必须带数据版本标注与「非官方」声明。
 - 穿甲矩阵三色判定以 PRD 4.1 为准，页面标注「仅供参考，以游戏内实测为准」。

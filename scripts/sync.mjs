@@ -19,6 +19,12 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const DATA_DIR = path.join(ROOT, 'data');
 const DB_PATH = path.join(DATA_DIR, 'delta.db');
 
+// 口径图标文件名真源与前端共用同一份 JSON（constants/caliber-icons.json），
+// 避免「前端常量表 + 脚本映射表」两份数据各自维护而漂移
+const CALIBER_ICON_FILES = JSON.parse(
+  fs.readFileSync(path.join(ROOT, 'constants', 'caliber-icons.json'), 'utf-8')
+);
+
 const SOURCES = {
   guns: 'https://cdn.jsdelivr.net/gh/jiansenc/DeltaForceData@main/public/json/gun/gunRifle.json',
   ammo: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/ammo.json',
@@ -38,6 +44,22 @@ const TIER_BY_RARITY = { 白: 1, 绿: 2, 蓝: 3, 紫: 4, 橙: 5, 金: 5 };
 const SEASON_BY_DATASET = {
   '20261105-weiguang.1': 'S12',
 };
+
+/**
+ * 校验下载内容是否为可用的位图（PNG / JPEG / GIF / WebP 魔数）
+ * 图片 CDN 在限流或维护时可能返回 HTML 错误页，直接落盘成 .png 会让前端显示破图
+ * @param {Buffer} buf - 下载到的字节内容
+ * @returns {boolean} 是否为有效图片
+ */
+function isImageBuffer(buf) {
+  if (buf.length < 12) return false;
+  const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  const isJpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  const isGif = buf.subarray(0, 3).toString('ascii') === 'GIF';
+  const isWebp =
+    buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP';
+  return isPng || isJpeg || isGif || isWebp;
+}
 
 /**
  * 计算弹药关键字段指纹（id + 穿透等级 + 穿透矩阵），用于跨次同步比对数据是否变动
@@ -241,7 +263,6 @@ async function main() {
       image: g.pic ?? '',
       // 候选图 URL 列表（下载时按顺序尝试，成功即止）
       imageUrls: [g.pic ?? ''].filter(Boolean),
-      imagePre: g.prePic ?? '',
       panel,
       slots: (gd.accessory ?? []).map((s) => s.slotID).filter(Boolean),
       source: 'dfd',
@@ -283,7 +304,6 @@ async function main() {
       caliber,
       image: tierImg || dfcImg,
       imageUrls: [...new Set([tierImg, dfcImg, dfcImgMirror])].filter(Boolean),
-      imagePre: '',
       panel: {
         meatHarm: w.baseDamage, armorHarm: w.armorDamage, fireRate: w.fireRate,
         effectiveRange: w.effectiveRange, recoil: w.control, control: w.handling,
@@ -328,7 +348,6 @@ async function main() {
       caliber: normalizeCaliber(w.caliber),
       image: tierImg,
       imageUrls: [tierImg],
-      imagePre: '',
       panel: {
         meatHarm: w.flesh_damage, armorHarm: w.armor_damage, fireRate: w.rpm,
         effectiveRange: w.valid_range_m, recoil: pa.recoil_control, control: pa.handling,
@@ -479,6 +498,12 @@ async function main() {
   let db;
   try {
     if (fs.existsSync(DB_PATH)) fs.unlinkSync(DB_PATH);
+    // 主库删除后必须同时清掉 WAL / SHM：残留的非空 WAL 会把旧页带回新库，
+    // 表现为「重建后仍读到上次数据」，严重时抛出 database disk image is malformed
+    for (const suffix of ['-wal', '-shm']) {
+      const side = `${DB_PATH}${suffix}`;
+      if (fs.existsSync(side)) fs.unlinkSync(side);
+    }
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
   } catch (e) {
@@ -496,7 +521,7 @@ async function main() {
     );
     CREATE TABLE weapons (
       id TEXT PRIMARY KEY, name TEXT, category TEXT, caliber TEXT,
-      image TEXT, imagePre TEXT,
+      image TEXT,
       panel TEXT, slots TEXT, source TEXT, updated_at TEXT
     );
     CREATE TABLE ammo_weapons (
@@ -511,7 +536,7 @@ async function main() {
 
   const now = new Date().toISOString();
   const insAmmo = db.prepare(`INSERT INTO ammo VALUES (@id,@name,@caliber,@tier,@rarity,@pen_level,@dmg_ratio,@armor_ratio,@matrix,@effects,@season_limited,@note,@updated_at)`);
-  const insWeapon = db.prepare(`INSERT INTO weapons VALUES (@id,@name,@category,@caliber,@image,@imagePre,@panel,@slots,@source,@updated_at)`);
+  const insWeapon = db.prepare(`INSERT INTO weapons VALUES (@id,@name,@category,@caliber,@image,@panel,@slots,@source,@updated_at)`);
   const insAW = db.prepare(`INSERT OR IGNORE INTO ammo_weapons VALUES (@ammo_id,@weapon_id)`);
 
   db.transaction(() => {
@@ -554,6 +579,7 @@ async function main() {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = Buffer.from(await res.arrayBuffer());
           if (!buf.length) throw new Error('空文件');
+          if (!isImageBuffer(buf)) throw new Error(`响应不是有效图片（${res.headers.get('content-type') ?? '未知类型'}）`);
           fs.writeFileSync(file, buf);
           imgOk++;
           ok = true;
@@ -573,26 +599,32 @@ async function main() {
   })();
   console.log(`  图片: 新下载 ${imgOk} | 已存在 ${imgSkip} | 失败 ${imgFail}`);
 
-  // ---- 5.7 弹药口径图标本地化（playerhub 官方贴图，按口径区分）----
+  // 清理孤儿图：武器 id 变更或来源调整后，旧文件名会一直留在 public/img/weapons
+  // 仅在阈值校验通过（weapons 数量可信）后执行，且只删除纯数字命名的自动产物
+  const validImageFiles = new Set(weapons.filter((w) => w.image).map((w) => `${w.id}.png`));
+  let imgRemoved = 0;
+  for (const name of fs.readdirSync(IMG_DIR)) {
+    if (!/^\d+\.png$/.test(name) || validImageFiles.has(name)) continue;
+    fs.unlinkSync(path.join(IMG_DIR, name));
+    imgRemoved++;
+  }
+  if (imgRemoved) console.log(`  清理孤儿图: ${imgRemoved} 张`);
+
+  // ---- 5.6 弹药口径图标本地化（playerhub 官方贴图，按口径区分）----
   // 数据源 ammo.json 无图标字段，图标按口径从 playerhub 拉取，本地化避免热链
-  const AMMO_ICON_MAP = {
-    '.300BLK': '300BLK', '.338 Lap Mag': '338', '.357 Magnum': '357',
-    '.45ACP': '45-ACP', '.50AE': '50-AE', '12.7x55': '12.7x55',
-    '12Gauge': '12-Gauge', '4.6x30mm': '4.6x30mm', '5.45x39mm': '5.45x39mm',
-    '5.56x45mm': '5.56x45mm', '5.7x28mm': '5.7x28mm', '5.8x42mm': '5.8x42mm',
-    '6.8x51mm': '6.8x51mm', '7.62x39mm': '7.62x39mm', '7.62x51mm': '7.62x51mm',
-    '7.62x54R': '7.62x54mm', '9x19mm': '9x19mm', '9x39mm': '9x39mm',
-  };
+  // 口径 -> 文件名映射与前端共用 constants/caliber-icons.json
   const AMMO_IMG_DIR = path.join(ROOT, 'public', 'img', 'ammo');
   fs.mkdirSync(AMMO_IMG_DIR, { recursive: true });
   let ammoImgOk = 0, ammoImgSkip = 0, ammoImgFail = 0;
-  for (const [caliber, file] of Object.entries(AMMO_ICON_MAP)) {
+  for (const [caliber, file] of Object.entries(CALIBER_ICON_FILES)) {
     const dest = path.join(AMMO_IMG_DIR, `${file}.png`);
     if (fs.existsSync(dest) && fs.statSync(dest).size > 0) { ammoImgSkip++; continue; }
     try {
       const res = await fetch(`https://playerhub.df.qq.com/playerhub/60004/object/gun/ammo/${file}.png`, { signal: AbortSignal.timeout(30000) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (!isImageBuffer(buf)) throw new Error('响应不是有效图片');
+      fs.writeFileSync(dest, buf);
       ammoImgOk++;
     } catch (e) {
       ammoImgFail++;
@@ -601,7 +633,7 @@ async function main() {
   }
   console.log(`  弹药图标: 新下载 ${ammoImgOk} | 已存在 ${ammoImgSkip} | 失败 ${ammoImgFail}`);
 
-  // ---- 5.6 生成搜索索引（前端内存检索用）----
+  // ---- 5.7 生成搜索索引（前端内存检索用）----
   const PUBLIC_DIR = path.join(ROOT, 'public');
   fs.mkdirSync(PUBLIC_DIR, { recursive: true });
   const searchIndex = {

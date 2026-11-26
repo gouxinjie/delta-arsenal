@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { getMeta } from '@/lib/db';
 import { IconChart, IconAmmo, IconBook, IconUnknown } from '@/components/commons/icons';
+import type { SiteCounts } from '@/types/site';
 
 /**
  * @page Home
@@ -13,8 +14,8 @@ import { IconChart, IconAmmo, IconBook, IconUnknown } from '@/components/commons
 
 /** 首页入口卡片配置 */
 interface EntranceCard {
-  /** 目标路由 */
-  href: string;
+  /** 目标路由；二期未上线功能不设跳转目标 */
+  href?: string;
   /** 卡片角标（英文代号） */
   tag: string;
   /** 标题 */
@@ -31,6 +32,37 @@ interface EntranceCard {
   core?: boolean;
   /** 是否二期功能：整体降低视觉权重，不做 hover 抬升 */
   soon?: boolean;
+}
+
+/**
+ * 入口卡片外壳：有目标路由渲染为可点击链接，二期未上线模块渲染为不可交互容器
+ * （未上线功能若仍包一层链接，会出现「点击敬请期待却跳到其他页面」的矛盾）
+ * @param props.href - 目标路由，缺省表示功能未上线
+ * @param props.className - 卡片样式类
+ * @param props.children - 卡片内容
+ */
+function CardShell({ href, className, children }: { href?: string; className: string; children: ReactNode }) {
+  if (!href) {
+    return (
+      <div className={className} aria-disabled="true">
+        {children}
+      </div>
+    );
+  }
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * 数量展示：数据库缺失时显示「—」，不展示未经证实的数字
+ * @param value - 计数值或 null
+ * @returns 展示文本
+ */
+function showNum(value: number | null): string {
+  return value === null ? '—' : String(value);
 }
 
 /** 数据来源展示项 */
@@ -310,21 +342,31 @@ function MatrixPreview() {
 }
 
 export default function Home() {
-  let counts: { ammo: number; weapons: number } = { ammo: 118, weapons: 81 };
+  // 计数缺省为 null：数据库缺失时展示「—」，不用写死的数字假装有数据
+  let counts: SiteCounts = { ammo: null, weapons: null };
   let season = '—';
   let datasetVersion = '';
   let updated = '—';
   let sourcesRaw = '';
   try {
     const meta = getMeta();
-    counts = JSON.parse(meta.counts ?? '{}') as { ammo: number; weapons: number };
+    if (meta.counts) {
+      const parsed: unknown = JSON.parse(meta.counts);
+      if (parsed && typeof parsed === 'object') {
+        const raw = parsed as { ammo?: unknown; weapons?: unknown };
+        counts = {
+          ammo: typeof raw.ammo === 'number' ? raw.ammo : null,
+          weapons: typeof raw.weapons === 'number' ? raw.weapons : null,
+        };
+      }
+    }
     season = meta.season ?? '—';
     // 上游数据集版本（如 20261105-weiguang.1），用于判断本站数据是否落后于当前赛季
     datasetVersion = meta.datasetVersion && meta.datasetVersion !== 'unknown' ? meta.datasetVersion : '';
-    updated = new Date(meta.generatedAt).toLocaleDateString('zh-CN');
+    updated = meta.generatedAt ? new Date(meta.generatedAt).toLocaleDateString('zh-CN') : '—';
     sourcesRaw = meta.sources ?? '';
   } catch {
-    // 数据库缺失时用兜底数值渲染骨架
+    // 数据库缺失时渲染骨架，数值位显示「—」
   }
 
   const sources = parseSources(sourcesRaw);
@@ -344,8 +386,8 @@ export default function Home() {
       href: '/ammo',
       tag: 'AMMO',
       title: '弹药库',
-      desc: `全口径 ${counts.ammo} 种弹药：穿透等级、伤害比例、适用枪械。`,
-      short: `全口径 ${counts.ammo} 种弹药的穿透与伤害`,
+      desc: `全口径 ${showNum(counts.ammo)} 种弹药：穿透等级、伤害比例、适用枪械。`,
+      short: `全口径 ${showNum(counts.ammo)} 种弹药的穿透与伤害`,
       icon: <IconAmmo className="h-5 w-5 sm:h-7 sm:w-7" />,
       span: '',
     },
@@ -353,13 +395,13 @@ export default function Home() {
       href: '/weapons',
       tag: 'ARMS',
       title: '武器图鉴',
-      desc: `收录 ${counts.weapons} 把枪械：面板、口径、可改装槽位。`,
-      short: `${counts.weapons} 把枪械的面板与改装数据`,
+      desc: `收录 ${showNum(counts.weapons)} 把枪械：面板、口径、可改装槽位。`,
+      short: `${showNum(counts.weapons)} 把枪械的面板与改装数据`,
       icon: <IconBook className="h-5 w-5 sm:h-7 sm:w-7" />,
       span: '',
     },
     {
-      href: '/about',
+      // 二期功能：不设 href，渲染为不可点击卡片，避免误导跳转
       tag: 'SOON',
       title: '改枪码',
       desc: '二期上线，敬请期待。',
@@ -426,11 +468,11 @@ export default function Home() {
           <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 sm:mt-8 sm:flex sm:flex-wrap sm:items-end sm:gap-x-10 sm:gap-y-5">
             <div className="border-l border-accent/30 pl-3">
               <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">弹药 AMMO</dt>
-              <dd className="num mt-1 text-2xl font-bold leading-none text-accent">{counts.ammo}</dd>
+              <dd className="num mt-1 text-2xl font-bold leading-none text-accent">{showNum(counts.ammo)}</dd>
             </div>
             <div className="border-l border-info/30 pl-3">
               <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">枪械 ARMS</dt>
-              <dd className="num mt-1 text-2xl font-bold leading-none text-info">{counts.weapons}</dd>
+              <dd className="num mt-1 text-2xl font-bold leading-none text-info">{showNum(counts.weapons)}</dd>
             </div>
             <div className="border-l border-edge pl-3">
               <dt className="num text-[10px] tracking-[0.2em] text-muted sm:tracking-[0.3em]">数据更新</dt>
@@ -466,13 +508,13 @@ export default function Home() {
       <section className="space-y-3 sm:space-y-4">
         <div className="flex items-end justify-between">
           <h2 className="text-[13px] font-bold tracking-[0.2em] text-muted">核心模块</h2>
-          <span className="num text-[10px] tracking-[0.2em] text-muted/50">4 MODULES</span>
+          <span className="num text-[10px] tracking-[0.2em] text-muted/50">{cards.length} MODULES</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {cards.map((c, i) => (
-            <Link
-              key={c.href}
+            <CardShell
+              key={c.href ?? c.title}
               href={c.href}
               className={`tac-panel tac-panel-plain group relative flex flex-col overflow-hidden rounded-xl p-3.5 sm:p-5 ${c.span} ${
                 c.soon ? 'opacity-70 hover:border-edge' : 'tac-hover-flat'
@@ -553,7 +595,7 @@ export default function Home() {
                   </span>
                 )}
               </span>
-            </Link>
+            </CardShell>
           ))}
         </div>
       </section>

@@ -1,4 +1,4 @@
-import { getAllWeapons, getAmmoOfWeapon } from '@/lib/db';
+import { getAllWeapons, getAmmoByWeaponMap } from '@/lib/db';
 import { parseAmmoEffects } from '@/lib/ammo-effects';
 import WeaponBrowser from '@/components/commons/WeaponBrowser';
 import PageHero from '@/components/commons/PageHero';
@@ -8,7 +8,9 @@ import type { WeaponDetail, WeaponPanel } from '@/types/weapon';
 export const metadata = { title: '武器图鉴' };
 
 export default function WeaponsPage() {
-  // 构建期一次性组装卡片 + 抽屉所需的完整数据，运行时零额外请求
+  // 构建期一次性取全量关联（单条 JOIN），再在内存按武器分组，避免逐把武器查询的 N+1
+  const ammoByWeapon = getAmmoByWeaponMap();
+  // 组装卡片 + 抽屉所需的完整数据，运行时零额外请求
   const weapons: WeaponDetail[] = getAllWeapons().map((w) => ({
     id: w.id,
     name: w.name,
@@ -17,7 +19,7 @@ export default function WeaponsPage() {
     image: w.image,
     panel: JSON.parse(w.panel || '{}') as WeaponPanel,
     slots: JSON.parse(w.slots || '[]') as string[],
-    ammo: getAmmoOfWeapon(w.id).map((a) => ({
+    ammo: (ammoByWeapon[w.id] ?? []).map((a) => ({
       id: a.id,
       name: a.name,
       caliber: a.caliber,

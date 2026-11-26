@@ -7,8 +7,7 @@
  */
 'use client';
 
-/** localStorage 中保存主题的键名（需与 layout.tsx 首屏防闪脚本保持一致） */
-const THEME_STORAGE_KEY = 'delta-theme';
+import { THEME_STORAGE_KEY } from '@/constants/site';
 
 export default function ThemeToggle() {
   /**

@@ -187,32 +187,31 @@ export function IconUnknown({ className }: IconProps) {
   );
 }
 
-/** 伤害（准星） */
-export function IconTarget({ className }: IconProps) {
+/** 可穿透（对勾） */
+export function IconCheck({ className }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="7" />
-      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="m4 12.5 5 5 11-11" />
     </svg>
   );
 }
 
-/** 射速（闪电） */
-export function IconBolt({ className }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M13 2 4 14h6l-1 8 9-12h-6z" />
-    </svg>
-  );
-}
-
-/** 后坐力（上下双箭头） */
-export function IconRecoil({ className }: IconProps) {
+/** 可穿但衰减（警告三角） */
+export function IconWarn({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="m6 9 6-5 6 5" />
-      <path d="m6 15 6 5 6-5" />
+      <path d="M12 3.5 21 20H3z" />
+      <path d="M12 9.5v4.5" />
+      <circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** 打不穿（叉号） */
+export function IconCross({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" className={className} aria-hidden="true">
+      <path d="m6 6 12 12M18 6 6 18" />
     </svg>
   );
 }

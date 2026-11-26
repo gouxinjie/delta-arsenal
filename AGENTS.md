@@ -1,7 +1,7 @@
 # AGENTS.md — 三角洲军械库（Delta Arsenal）
 
 > 本文件供 AI Agent（Claude Code / WorkBuddy / Cursor 等）在本仓库工作时阅读。
-> 产品需求详见 `PRD.md`，本文件只讲工程事实与约定。
+> 产品需求详见 `README.md`，穿甲判定口径见 `/about` 页与矩阵页图例，本文件只讲工程事实与约定。
 
 ## 项目是什么
 
@@ -18,10 +18,14 @@
 ## 常用命令
 
 ```bash
-npm run sync     # 拉取三源 → 重建 data/delta.db（有阈值校验，低于阈值不写入）
-npm run dev      # 本地开发（待 M2 接入 Next.js 后可用）
-npm run build    # SSG 构建
+pnpm run sync       # 拉取三源 → 重建 data/delta.db（有阈值校验，低于阈值不写入）
+pnpm run dev        # 本地开发（http://localhost:3800）
+pnpm run build      # SSG 构建
+pnpm run typecheck  # tsc --noEmit
+pnpm run lint       # ESLint
 ```
+
+> Node 版本要求 ≥ 22，已用仓库根 `.node-version` 声明精确版本。
 
 ## 数据链路（重要）
 
@@ -44,19 +48,22 @@ npm run build    # SSG 构建
 ```
 app/                  Next.js 路由
 components/commons/   公共组件（每组件独立文件夹 + index.tsx）
+hooks/                通用前端行为 Hook（useOverlay 等）
+constants/            游戏与站点常量（caliber-icons.json 为口径图标真源，前端与 sync 共用）
 lib/                  数据库读取层（db.ts，全部带 JSDoc）
 scripts/              sync.mjs 等脚本
-data/                 delta.db（入库，勿手改；重建走 npm/pnpm run sync）
-public/img/           构建期下载的武器图片
+data/                 delta.db（入库，勿手改；重建走 pnpm run sync）
+public/img/weapons/   构建期下载的武器图
+public/img/ammo/      构建期下载的口径贴图
 public/search-index.json  前端搜索索引（sync 生成）
 tmp/                  抓取缓存（gitignore）
-PRD.md                产品需求文档（v0.3 定稿）
+UI/                   设计稿参考图
 ```
 
 ## 约定与红线
 
 1. **不要手改 `data/delta.db`**——它是生成物，改了会被下次 sync 覆盖
-2. 主题色 token 见 PRD 2.2（底 `#12141A` / 面板 `#1B1F29` / 强调橙 `#FF9E2C`），写组件时用 CSS 变量，不要散落硬编码
+2. 主题色 token 以 `app/globals.css` 为唯一事实源（暗色：底 `#0a0f15` / 面板 `#101922` / 强调青绿 `#2fe3a4`；浅色见 `[data-theme="light"]`），写组件时用 CSS 变量，不要散落硬编码
 3. 数字/口径一律等宽字体
 4. 页面必须带数据版本标注（读 `meta` 表）与「非官方」声明
 5. 穿甲矩阵三色判定规则以 PRD 4.1 为准，页面需标注「仅供参考，以游戏内实测为准」

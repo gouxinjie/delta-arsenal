@@ -7,12 +7,13 @@
  */
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { IconAmmo, IconRifle } from '@/components/commons/icons';
-import { AMMO_EFFECT_TONE, CALIBER_ICON } from '@/constants/game';
+import { AMMO_EFFECT_TONE, CALIBER_ICON, RARITY_LABEL, tierColor } from '@/constants/game';
 import { describeAmmoEffects } from '@/lib/ammo-effects';
+import { useOverlay } from '@/hooks/useOverlay';
 import type { AmmoEffects } from '@/types/ammo';
 
 /** 弹药的适用枪械（含本地图片，供详情抽屉展示） */
@@ -55,9 +56,6 @@ interface AmmoItem {
   weapons?: AmmoWeapon[];
 }
 
-const TIER_COLOR = ['var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)', 'var(--t5)'];
-const RARITY_LABEL: Record<string, string> = { 白: '白弹', 绿: '绿弹', 蓝: '蓝弹', 紫: '紫弹', 橙: '金弹', 金: '金弹', 红: '专属弹' };
-
 /**
  * 弹药品阶配色：红品阶（专属弹，穿 6/7）与常规五阶分开取色
  * @param a - 弹药数据
@@ -65,7 +63,7 @@ const RARITY_LABEL: Record<string, string> = { 白: '白弹', 绿: '绿弹', 蓝
  */
 function ammoTierColor(a: AmmoItem): string {
   if (a.rarity === '红' || a.pen_level >= 6) return 'var(--danger)';
-  return a.tier ? TIER_COLOR[a.tier - 1] : 'var(--t1)';
+  return tierColor(a.tier);
 }
 
 /**
@@ -199,9 +197,28 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
   const [caliber, setCaliber] = useState('全部');
   const [pen, setPen] = useState('全部');
   const [tier, setTier] = useState('全部');
-  const [selected, setSelected] = useState<AmmoItem | null>(
-    sp.get('q') ? (ammo.find((a) => a.name.toLowerCase().includes(sp.get('q')!.toLowerCase())) ?? null) : null
-  );
+  /** 用户从列表点开的目标（优先级高于 URL 参数） */
+  const [picked, setPicked] = useState<AmmoItem | null>(null);
+  /** 已关闭过的 URL 参数指纹：避免用户关掉抽屉后被同一组参数重新顶开 */
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+
+  /** 搜索弹窗 / 武器详情传入的弹药 id（精确命中） */
+  const ammoParam = sp.get('ammo');
+  /** 旧链接兜底：按名称模糊命中 */
+  const queryParam = sp.get('q');
+  const paramKey = `${ammoParam ?? ''}|${queryParam ?? ''}`;
+
+  // 选中项由「列表点击」与「URL 参数」派生得到，不在 effect 里 setState：
+  // 路由 query 变化不会重挂载组件，派生值可直接跟随 URL，同时避免级联渲染
+  const selected = useMemo<AmmoItem | null>(() => {
+    if (picked) return picked;
+    if (!ammoParam && !queryParam) return null;
+    if (dismissedKey === paramKey) return null;
+    if (ammoParam) return ammo.find((a) => a.id === ammoParam) ?? null;
+    if (!queryParam) return null;
+    const keyword = queryParam.toLowerCase();
+    return ammo.find((a) => a.name.toLowerCase().includes(keyword)) ?? null;
+  }, [picked, ammo, ammoParam, queryParam, paramKey, dismissedKey]);
 
   const calibers = useMemo(() => ['全部', ...new Set(ammo.map((a) => a.caliber))], [ammo]);
 
@@ -248,20 +265,14 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
   // 抽屉内的适用枪械（含本地图片，无关联时为空数组）
   const selectedWeapons = selected?.weapons ?? [];
 
-  // 抽屉打开时锁定背景滚动并支持 Esc 关闭：移动端底下列表很长，不锁定会跟着手指一起滚
-  useEffect(() => {
-    if (!selected) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelected(null);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [selected]);
+  /** 关闭详情抽屉（引用稳定，供 useOverlay 依赖）：同时记录当前参数指纹，避免被 URL 重新顶开 */
+  const closeDrawer = useCallback(() => {
+    setPicked(null);
+    setDismissedKey(paramKey);
+  }, [paramKey]);
+
+  // 抽屉无障碍：滚动锁定 + Esc 关闭 + 焦点陷阱 + 关闭后焦点归还（细节见 hooks/useOverlay）
+  const drawerRef = useOverlay<HTMLDivElement>(!!selected, closeDrawer);
 
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-5">
@@ -360,7 +371,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                   <li key={a.id} className="border-t border-edge/40 first:border-t-0">
                     <button
                       type="button"
-                      onClick={() => setSelected(a)}
+                      onClick={() => setPicked(a)}
                       className="w-full px-3 py-2.5 text-left transition-colors active:bg-panel-hi/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/50"
                     >
                       <div className="flex items-center gap-2">
@@ -437,8 +448,17 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                     return (
                       <tr
                         key={a.id}
-                        onClick={() => setSelected(a)}
-                        className="border-b border-edge/60 last:border-0 cursor-pointer hover:bg-panel-hi/60 transition-colors"
+                        // 行级交互：鼠标点击与键盘 Enter/Space 走同一条路径（移动端条目本身是 button）
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`查看 ${a.name} 弹药详情`}
+                        onClick={() => setPicked(a)}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter' && e.key !== ' ') return;
+                          e.preventDefault();
+                          setPicked(a);
+                        }}
+                        className="border-b border-edge/60 last:border-0 cursor-pointer hover:bg-panel-hi/60 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60"
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
@@ -501,13 +521,15 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
       {selected && (
         <div
           className="fixed inset-0 z-50 bg-[color:var(--overlay)] anim-fade"
-          onClick={() => setSelected(null)}
+          onClick={closeDrawer}
         >
           <div
+            ref={drawerRef}
             role="dialog"
             aria-modal="true"
             aria-label={`${selected.name} 弹药详情`}
-            className="absolute right-0 top-0 h-dvh w-full max-w-full overflow-y-auto bg-panel border-l border-edge p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] anim-slide [box-shadow:var(--drawer-shadow)] sm:w-96 sm:p-6"
+            tabIndex={-1}
+            className="absolute right-0 top-0 h-dvh w-full max-w-full overflow-y-auto bg-panel border-l border-edge p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] anim-slide outline-none [box-shadow:var(--drawer-shadow)] sm:w-96 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -518,7 +540,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                 </p>
               </div>
               <button
-                onClick={() => setSelected(null)}
+                onClick={closeDrawer}
                 aria-label="关闭弹药详情"
                 className="-mr-1.5 -mt-1.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-2xl leading-none text-muted hover:bg-panel-hi hover:text-accent transition-colors"
               >
@@ -592,7 +614,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
                   <li key={w.id}>
                     <Link
                       href={`/weapons/${w.id}`}
-                      onClick={() => setSelected(null)}
+                      onClick={closeDrawer}
                       className="flex items-center gap-2 rounded border border-edge bg-bg/40 px-2 py-1.5 hover:border-accent hover:text-accent transition-colors"
                       title={w.name}
                     >
@@ -615,7 +637,7 @@ export default function AmmoBrowser({ ammo }: { ammo: AmmoItem[] }) {
             <Link
               href="/ammo/matrix"
               className="mt-6 block text-center text-sm border border-edge rounded py-2 hover:border-accent hover:text-accent transition-colors"
-              onClick={() => setSelected(null)}
+              onClick={closeDrawer}
             >
               查看穿甲对照矩阵 →
             </Link>

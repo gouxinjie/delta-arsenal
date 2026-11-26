@@ -3,16 +3,26 @@
  * @description 全站页脚：数据版本与更新时间、收录统计、关于入口、非官方免责声明
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-25
+ * @updated 2026-11-26
  */
 import Link from 'next/link';
+import type { SiteCounts } from '@/types/site';
 
 /** Footer 组件入参 */
 interface FooterProps {
   /** 数据元信息（季节版本、更新时间、来源等） */
   meta: Record<string, string>;
-  /** 收录数量统计 */
-  counts: { ammo: number; weapons: number };
+  /** 收录数量统计，null 表示数据库缺失（渲染为「—」） */
+  counts: SiteCounts;
+}
+
+/**
+ * 数字兜底展示：null 统一渲染为「—」，避免把「无数据」显示成 0
+ * @param value - 计数值
+ * @returns 展示文本
+ */
+function showCount(value: number | null): string {
+  return value === null ? '—' : String(value);
 }
 
 export default function Footer({ meta, counts }: FooterProps) {
@@ -27,7 +37,7 @@ export default function Footer({ meta, counts }: FooterProps) {
             数据版本 {meta.season ?? '—'} · {datasetVersion || '—'} · 更新于 {updated}
           </span>
           <span className="num">
-            收录弹药 {counts.ammo} · 武器 {counts.weapons}
+            收录弹药 {showCount(counts.ammo)} · 武器 {showCount(counts.weapons)}
           </span>
           <Link href="/about" className="hover:text-accent">
             关于与免责声明

@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 import { getAllWeapons, getWeapon, getAmmoOfWeapon, getRelatedWeapons } from '@/lib/db';
 import { describeAmmoEffects, parseAmmoEffects } from '@/lib/ammo-effects';
 import { IconRifle } from '@/components/commons/icons';
-import { AMMO_EFFECT_TONE, SLOT_NAMES } from '@/constants/game';
+import { AMMO_EFFECT_TONE, SLOT_NAMES, tierTextClass } from '@/constants/game';
+import type { WeaponPanel } from '@/types/weapon';
 
 export function generateStaticParams() {
   return getAllWeapons().map((w) => ({ id: w.id }));
@@ -15,7 +16,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: w ? w.name : '武器详情' };
 }
 
-const TIER_TEXT = ['text-t1', 'text-t2', 'text-t3', 'text-t4', 'text-t5'];
 const TIER_BORDER = ['border-l-t1', 'border-l-t2', 'border-l-t3', 'border-l-t4', 'border-l-t5'];
 
 export default async function WeaponDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -23,12 +23,14 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
   const w = getWeapon(id);
   if (!w) notFound();
 
-  const panel = JSON.parse(w.panel || '{}');
-  const slots: string[] = JSON.parse(w.slots || '[]');
+  // 库中为 JSON 字符串，构建期解析并显式标注类型（禁止隐式 any）
+  const panel = JSON.parse(w.panel || '{}') as WeaponPanel;
+  const slots = JSON.parse(w.slots || '[]') as string[];
   const ammo = getAmmoOfWeapon(id);
   const related = getRelatedWeapons(w);
 
-  const panelItems: [string, string | number][] = [
+  // 面板字段可能缺省（补充源枪械），缺省项在渲染时过滤掉
+  const panelItems: [string, string | number | undefined][] = [
     ['肉体伤害', panel.meatHarm], ['护甲伤害', panel.armorHarm],
     ['射速', panel.fireRate], ['有效射程', panel.effectiveRange],
     ['后坐力控制', panel.recoil], ['操控速度', panel.control],
@@ -42,7 +44,12 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
       <div className="flex flex-col md:flex-row gap-6">
         <div className="tac-panel md:w-2/5 p-4 flex items-center justify-center">
           {w.image ? (
-            <img src={w.image} alt={w.name} className="max-h-48 w-full object-contain sm:max-h-64" />
+            <img
+              src={w.image}
+              alt={w.name}
+              loading="lazy"
+              className="max-h-48 w-full object-contain sm:max-h-64"
+            />
           ) : (
             <span className="text-muted/30" aria-hidden="true">
               <IconRifle className="w-24 h-24" />
@@ -64,7 +71,7 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
                 </div>
               ))}
           </div>
-          {panel.fireModes?.length > 0 && (
+          {panel.fireModes && panel.fireModes.length > 0 && (
             <p className="num text-xs text-muted mt-3">开火模式：{panel.fireModes.join(' / ')}</p>
           )}
         </div>
@@ -80,7 +87,7 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
               return (
                 <Link
                   key={a.id}
-                  href={`/ammo?q=${encodeURIComponent(a.name)}`}
+                  href={`/ammo?ammo=${a.id}`}
                   className={`tac-panel !border-l-2 ${a.tier ? TIER_BORDER[a.tier - 1] : 'border-l-edge'} px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm hover:border-accent transition-colors`}
                 >
                   <span>{a.name}</span>
@@ -95,7 +102,7 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
                     </span>
                   ))}
                   <span className="num text-xs text-muted ml-auto">
-                    穿透 <b className={a.tier ? TIER_TEXT[a.tier - 1] : ''}>{a.pen_level}</b> 级 · 伤害
+                    穿透 <b className={a.tier ? tierTextClass(a.tier) : ''}>{a.pen_level}</b> 级 · 伤害
                     {Math.round(a.dmg_ratio * 100)}%
                   </span>
                 </Link>

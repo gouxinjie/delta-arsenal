@@ -5,6 +5,8 @@ data/*.db-shm
 data/*.db-wal
 .next/
 .env*
+# 环境变量模板需要入库，供他人照抄（上面 .env* 会把它一起忽略）
+!.env.example
 .DS_Store
 # 浏览器自动化会话产物（每次执行 playwright/agent-browser 都会生成）
 .playwright-cli/

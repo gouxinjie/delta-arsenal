@@ -1,29 +1,36 @@
 {
   "name": "delta-arsenal",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "三角洲行动非官方军械数据速查站：弹药数据库 / 武器图鉴 / 穿甲对照矩阵",
+  "keywords": [
+    "delta-force",
+    "三角洲行动",
+    "nextjs",
+    "sqlite",
+    "ssg"
+  ],
+  "author": "gouxinjie",
+  "license": "ISC",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.24.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "sync": "node scripts/sync.mjs",
     "dev": "next dev -p 3800",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "better-sqlite3": "^13.2.0",
     "delta-force-core": "^0.8.0",
     "next": "^15.5.29",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
-  },
-  "type": "module",
-  "engines": {
-    "node": ">=22"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.5",
@@ -37,7 +44,8 @@
     "typescript": "^5.9.3"
   },
   "pnpm": {
-    "onlyBuiltDependencies": "[\"better-sqlite3\"]"
-  },
-  "packageManager": "pnpm@10.24.0"
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
+  }
 }

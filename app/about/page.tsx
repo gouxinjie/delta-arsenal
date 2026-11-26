@@ -21,11 +21,12 @@ export default function AboutPage() {
           </h2>
           <ul className="text-muted list-disc pl-5 space-y-1">
             <li>弹药全字段：社区实测整理数据集（delta-gun-tierlist 项目每日校准）</li>
-            <li>武器面板与图片：官方小程序数据镜像（DeltaForceData）</li>
+            <li>武器面板与图片：社区整理的官方小程序数据镜像（DeltaForceData）</li>
             <li>武器补充数据：开源结构化数据集 delta-force-core</li>
           </ul>
           <p className="text-muted mt-2">
-            每次赛季版本更新后 72 小时内完成数据同步；页脚展示当前数据版本与更新时间。
+            数据由维护者在新赛季版本后手动同步（本站不承诺固定时效）；页脚标注当前数据版本与同步时间，
+            可据此判断数据是否滞后。
           </p>
         </section>
         <section>
@@ -34,7 +35,7 @@ export default function AboutPage() {
             穿甲矩阵判定口径
           </h2>
           <p className="text-muted">
-            单元格为该弹种命中护甲覆盖部位时的肉体伤害保留比例，取自社区数据集的穿透矩阵（非官方，已与社区机制条目交叉核对）：
+            单元格为该弹种命中护甲覆盖部位时的肉体伤害保留比例，取自社区数据集的穿透矩阵（非官方，已与社区机制条目交叉核对）；显示「—」表示该护甲等级暂无实测数据：
             <br />
             多数常规弹遵循：弹穿级高于甲级 2 级以上 → 100% 全额；高 1 级 → 75%；同级 → 50%（部分穿透，护甲与肉体同步掉血）；
             低于护甲等级 → 无法穿透，0 肉伤，仅消耗护甲耐久。

@@ -160,11 +160,24 @@ export function getAmmoOfWeapon(weaponId: string): AmmoRow[] {
 }
 
 /**
- * 读取全部武器 id（供 generateStaticParams）
- * @returns 武器 objectID 数组
+ * 读取「武器 -> 可用弹药」映射（构建期一次性取全量，避免逐把武器查询造成 N+1）
+ * @returns 以武器 objectID 为键的弹药行数组（组内按穿透等级降序），无关联武器不出现在键中
  */
-export function getWeaponIds(): string[] {
-  return (db().prepare('SELECT id FROM weapons').all() as { id: string }[]).map((r) => r.id);
+export function getAmmoByWeaponMap(): Record<string, AmmoRow[]> {
+  const rows = db()
+    .prepare(
+      `SELECT aw.weapon_id AS weaponId, a.* FROM ammo a
+       JOIN ammo_weapons aw ON aw.ammo_id = a.id
+       ORDER BY a.pen_level DESC`
+    )
+    .all() as (AmmoRow & { weaponId: string })[];
+
+  const map: Record<string, AmmoRow[]> = {};
+  for (const row of rows) {
+    if (!map[row.weaponId]) map[row.weaponId] = [];
+    map[row.weaponId].push(row);
+  }
+  return map;
 }
 
 /**
@@ -174,7 +187,8 @@ export function getWeaponIds(): string[] {
  * @returns 同类别武器列表
  */
 export function getRelatedWeapons(weapon: WeaponRow, limit = 3): WeaponRow[] {
+  // 必须带 ORDER BY：无排序时 SQLite 返回顺序不稳定，SSG 每次构建的推荐位会跳动
   return db()
-    .prepare(`SELECT * FROM weapons WHERE category = ? AND id != ? LIMIT ?`)
+    .prepare(`SELECT * FROM weapons WHERE category = ? AND id != ? ORDER BY name LIMIT ?`)
     .all(weapon.category, weapon.id, limit) as WeaponRow[];
 }

@@ -3,6 +3,8 @@ import './globals.css';
 import Header from '@/components/commons/Header';
 import Footer from '@/components/commons/Footer';
 import { getMeta } from '@/lib/db';
+import { SITE_URL, THEME_STORAGE_KEY } from '@/constants/site';
+import type { SiteCounts } from '@/types/site';
 
 /**
  * 视口配置：固定按设备宽度渲染，viewportFit=cover 让固定在底部的抽屉 / 弹层
@@ -15,26 +17,51 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  // SSG 输出 canonical / OG 绝对地址的基准，随环境变量切换线上域名
+  metadataBase: new URL(SITE_URL),
   title: {
     default: '三角洲军械库 — 三角洲行动弹药与武器数据速查',
     template: '%s | 三角洲军械库',
   },
   description:
     '三角洲行动非官方军械数据速查站：全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵。撤离前先查这一站。',
+  applicationName: '三角洲军械库',
+  openGraph: {
+    type: 'website',
+    siteName: '三角洲军械库',
+    locale: 'zh_CN',
+    title: '三角洲军械库 — 三角洲行动弹药与武器数据速查',
+    description: '全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵，构建期直读社区数据源。',
+  },
+  twitter: {
+    card: 'summary',
+    title: '三角洲军械库 — 三角洲行动弹药与武器数据速查',
+    description: '全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵。',
+  },
 };
 
 /**
  * 首屏主题脚本：在水合前读回用户选择的主题，避免浅色用户先看到一帧暗色
- * 键名需与 components/commons/ThemeToggle 中的 THEME_STORAGE_KEY 保持一致
+ * 键名取自 constants/site 的 THEME_STORAGE_KEY，与 ThemeToggle 共用同一份字面量
  */
-const THEME_INIT_SCRIPT = `(function(){try{if(localStorage.getItem('delta-theme')==='light'){document.documentElement.dataset.theme='light';}}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{if(localStorage.getItem('${THEME_STORAGE_KEY}')==='light'){document.documentElement.dataset.theme='light';}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   let meta: Record<string, string> = {};
-  let counts = { ammo: 0, weapons: 0 };
+  // 计数缺省为 null：库缺失时页脚显示「—」，不向用户展示未经证实的数字
+  let counts: SiteCounts = { ammo: null, weapons: null };
   try {
     meta = getMeta();
-    counts = JSON.parse(meta.counts ?? '{}');
+    if (meta.counts) {
+      const parsed: unknown = JSON.parse(meta.counts);
+      if (parsed && typeof parsed === 'object') {
+        const raw = parsed as { ammo?: unknown; weapons?: unknown };
+        counts = {
+          ammo: typeof raw.ammo === 'number' ? raw.ammo : null,
+          weapons: typeof raw.weapons === 'number' ? raw.weapons : null,
+        };
+      }
+    }
   } catch {
     // 数据库缺失时页面仍可渲染骨架
   }
