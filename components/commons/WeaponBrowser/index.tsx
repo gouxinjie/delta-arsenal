@@ -1,6 +1,7 @@
 /**
  * @component WeaponBrowser
  * @description 武器图鉴浏览器：按类型 Tab（带图标 + 计数）筛选 + 名称关键词搜索（不区分大小写），卡片网格展示，
+ *              强势属性（肉伤 ≥ 35 / 甲伤 ≥ 35 / 射速 ≥ 700，任一项达标只高亮该项数值、标签不变），
  *              点击卡片从右侧弹出详情抽屉（不跳页）
  * @author gouxinjie
  * @created 2026-11-23
@@ -25,8 +26,15 @@ import {
 } from '@/components/commons/icons';
 import SmartImage from '@/components/commons/SmartImage';
 import WeaponDrawer from '@/components/commons/WeaponDrawer';
-import { WEAPON_CARD_STAT_KEYS, WEAPON_CATEGORY_ORDER, WEAPON_STAT_META } from '@/constants/weapon';
-import { computeStatMax } from '@/lib/view';
+import {
+  WEAPON_CARD_STAT_KEYS,
+  WEAPON_CATEGORY_ORDER,
+  WEAPON_GRADE_NOTE,
+  WEAPON_STAT_META,
+  weaponGradeLabel,
+  weaponGradeTextClass,
+} from '@/constants/weapon';
+import { computeStatMax, isHighlightedStat, sortByWeaponGrade } from '@/lib/view';
 import type { WeaponDetail } from '@/types/weapon';
 
 /** 图片偏小的分类：短枪身高宽比接近方形，在宽幅图区里会被撑满高度显得过大，单独缩放 */
@@ -58,16 +66,15 @@ const TABS: { label: string; icon: (cls: string) => React.ReactNode }[] = [
   { label: '未知', icon: (c) => <IconUnknown className={c} /> },
 ];
 
-/** 运营标记的热门武器（图鉴首页展示 🔥 热门角标） */
-const HOT_WEAPONS = new Set(['MP5冲锋枪', 'M4A1突击步枪', 'AK-12突击步枪', 'P90冲锋枪']);
-
 /** WeaponBrowser 组件入参 */
 interface WeaponBrowserProps {
-  /** 武器列表（含抽屉所需的弹药与槽位数据） */
+  /** 武器列表（含抽屉所需的弹药与槽位数据，hot 由 sync 按实战榜写入） */
   weapons: WeaponDetail[];
+  /** 热门判定依据说明（如「S12 实战榜 · 护甲5弹药5 · 任一距离档 T0」），用作角标 title；缺省不展示提示 */
+  hotNote?: string;
 }
 
-export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
+export default function WeaponBrowser({ weapons, hotNote }: WeaponBrowserProps) {
   const [tab, setTab] = useState('全部');
   /** 武器名称搜索关键词（受控输入，前后空格在过滤时忽略） */
   const [keyword, setKeyword] = useState('');
@@ -78,16 +85,18 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
   /** 归一化后的关键词：小写化实现英文名称不区分大小写 */
   const normalizedKeyword = keyword.trim().toLowerCase();
 
-  /** 待展示列表：先按分类 Tab 过滤，再按名称关键词包含匹配（两者同时生效） */
-  const list = useMemo(
-    () =>
-      weapons.filter((w) => {
-        if (tab !== '全部' && w.category !== tab) return false;
-        if (!normalizedKeyword) return true;
-        return w.name.toLowerCase().includes(normalizedKeyword);
-      }),
-    [weapons, tab, normalizedKeyword]
-  );
+  /**
+   * 待展示列表：先按分类 Tab 过滤，再按名称关键词包含匹配（两者同时生效），
+   * 最后按社区分级 1-4 升序排列（未定级沉底，同档内保持类别 / 名称次序）
+   */
+  const list = useMemo(() => {
+    const filtered = weapons.filter((w) => {
+      if (tab !== '全部' && w.category !== tab) return false;
+      if (!normalizedKeyword) return true;
+      return w.name.toLowerCase().includes(normalizedKeyword);
+    });
+    return sortByWeaponGrade(filtered);
+  }, [weapons, tab, normalizedKeyword]);
 
   /** 抽屉进度条用到的字段在全库中的最大值（刻度算法与武器详情页共用 lib/view） */
   const statMax = useMemo(() => computeStatMax(weapons.map((w) => w.panel)), [weapons]);
@@ -165,7 +174,8 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
       {/* 武器卡片网格 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-4 lg:grid-cols-3">
         {list.map((w) => {
-          const hot = HOT_WEAPONS.has(w.name);
+          /** 热门标记来自赛季实战榜（sync 写入），不再是前端写死名单 */
+          const hot = w.hot;
           return (
             <Link
               key={w.id}
@@ -179,16 +189,31 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
               <div className="flex items-start justify-between gap-2 px-3 pt-2.5 pb-2">
                 <div className="min-w-0">
                   <h3 className="text-sm font-semibold truncate">{w.name}</h3>
-                  <p className="text-[11px] text-muted mt-0.5 truncate">
-                    {w.category}
+                  {/* 用 flex-wrap 而不是 truncate：口径 + 等级两个胶囊在窄卡片上宁可换行，也不要把等级裁掉 */}
+                  <p className="text-[11px] text-muted mt-0.5 flex flex-wrap items-center gap-1">
+                    <span>{w.category}</span>
                     {/* 使用的弹药口径：强调色胶囊，与类别文字区分开 */}
-                    <span className="num ml-1 px-1 py-px rounded text-accent font-medium bg-accent/10">
+                    <span className="num px-1 py-px rounded text-accent font-medium bg-accent/10">
                       {w.caliber || '—'}
                     </span>
+                    {/* 社区分级徽标：1-4 级，未定级（grade=0）不渲染，避免出现「0 级枪」 */}
+                    {w.grade > 0 && (
+                      <span
+                        className={`num px-1 py-px rounded font-medium bg-accent/10 ${weaponGradeTextClass(w.grade)}`}
+                        title={WEAPON_GRADE_NOTE}
+                      >
+                        {weaponGradeLabel(w.grade)}
+                      </span>
+                    )}
                   </p>
                 </div>
                 {hot && (
-                  <span className="shrink-0 badge bg-danger/15 text-danger border-danger/40">🔥 热门</span>
+                  <span
+                    className="shrink-0 badge bg-danger/15 text-danger border-danger/40"
+                    title={hotNote || undefined}
+                  >
+                    🔥 热门
+                  </span>
                 )}
               </div>
 
@@ -210,12 +235,22 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
 
               {/* 参数栏：桌面 8 项一行，窄屏拆成 4 列 × 2 行，避免数字挤成一团 */}
               <div className="num grid grid-cols-4 gap-x-1 gap-y-2 px-2.5 py-2 border-t border-edge/60 sm:grid-cols-8 sm:gap-y-0">
-                {WEAPON_CARD_STAT_KEYS.map((key) => (
-                  <div key={key} className="flex flex-col items-center gap-0.5 min-w-0">
-                    <span className="text-[10px] text-muted whitespace-nowrap">{WEAPON_STAT_META[key].short}</span>
-                    <b className="text-[13px] font-semibold text-main">{w.panel[key] ?? '—'}</b>
-                  </div>
-                ))}
+                {WEAPON_CARD_STAT_KEYS.map((key) => {
+                  /** 逐项判定：该字段自身达标即用强调色 + 柔光高亮数值，标签保持常态、与其它字段无关 */
+                  const hotStat = isHighlightedStat(w.panel, key);
+                  return (
+                    <div key={key} className="flex flex-col items-center gap-0.5 min-w-0">
+                      <span className="text-[10px] text-muted whitespace-nowrap">{WEAPON_STAT_META[key].short}</span>
+                      <b
+                        className={`text-[13px] font-semibold ${
+                          hotStat ? 'text-accent [text-shadow:var(--bar-glow)]' : 'text-main'
+                        }`}
+                      >
+                        {w.panel[key] ?? '—'}
+                      </b>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* 底部操作条：常态强调色 + 淡强调底，hover 不再变化 */}

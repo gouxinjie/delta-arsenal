@@ -1,4 +1,4 @@
-import { getAmmoByWeaponMap, getAllWeapons } from '@/lib/db';
+import { getAmmoByWeaponMap, getAllWeapons, getMeta } from '@/lib/db';
 import { toWeaponDetail } from '@/lib/view';
 import WeaponBrowser from '@/components/commons/WeaponBrowser';
 import PageHero from '@/components/commons/PageHero';
@@ -14,6 +14,11 @@ export default function WeaponsPage() {
   const weapons: WeaponDetail[] = getAllWeapons().map((w) =>
     toWeaponDetail(w, ammoByWeapon[w.id] ?? [])
   );
+  // 热门角标判定依据由 sync 写入 meta（season / hotScenario / hotRule），页面不写死文案
+  const meta = getMeta();
+  const hotNote = meta.hotScenario
+    ? [meta.season, '实战榜', meta.hotScenario, meta.hotRule].filter(Boolean).join(' · ')
+    : '';
 
   return (
     <div>
@@ -24,10 +29,11 @@ export default function WeaponsPage() {
           <>
             共收录 <b className="text-accent num">{weapons.length}</b>{' '}
             款武器，点击卡片在侧边查看详细配置，了解武器性能与详细搭配。
+            {hotNote && <span className="block mt-1 text-[11px] text-muted">🔥 热门标记依据：{hotNote}</span>}
           </>
         }
       />
-      <WeaponBrowser weapons={weapons} />
+      <WeaponBrowser weapons={weapons} hotNote={hotNote} />
     </div>
   );
 }

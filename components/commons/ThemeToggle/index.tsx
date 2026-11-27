@@ -1,6 +1,6 @@
 /**
  * @component ThemeToggle
- * @description 主题切换按钮：暗黑（默认）↔ 白色主题，选择结果写入 localStorage，刷新后保持
+ * @description 主题切换按钮：浅色（默认）↔ 暗黑，选择结果写入 localStorage，刷新后保持
  * @author gouxinjie
  * @created 2026-11-25
  * @updated 2026-11-25

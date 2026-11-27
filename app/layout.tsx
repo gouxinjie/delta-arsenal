@@ -46,16 +46,18 @@ export const metadata: Metadata = {
 };
 
 /**
- * 首屏主题脚本：在水合前读回用户选择的主题，避免浅色用户先看到一帧暗色
+ * 首屏主题脚本：在水合前读回用户选择的主题，避免深色用户先看到一帧浅色
+ * 默认主题为浅色（html 上直接输出 data-theme="light"），只有用户主动切到深色才改属性
  * 键名取自 constants/site 的 THEME_STORAGE_KEY，与 ThemeToggle 共用同一份字面量
  */
-const THEME_INIT_SCRIPT = `(function(){try{if(localStorage.getItem('${THEME_STORAGE_KEY}')==='light'){document.documentElement.dataset.theme='light';}}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{if(localStorage.getItem('${THEME_STORAGE_KEY}')==='dark'){document.documentElement.dataset.theme='dark';}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // 元信息解析与计数兜底集中在 lib/site-meta（首页 / 页脚共用同一口径），缺库时降级为骨架
   const siteMeta = getSiteMeta();
   return (
-    <html lang="zh-CN" data-theme="dark" suppressHydrationWarning>
+    // data-theme 服务端固定输出 light：站点默认浅色，深色仅在用户主动切换后由首屏脚本改写
+    <html lang="zh-CN" data-theme="light" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

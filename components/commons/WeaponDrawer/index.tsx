@@ -3,7 +3,7 @@
  * @description 武器详情抽屉：从右侧滑出，展示可用子弹、枪械属性（带进度条刻度）与可改装槽位，替代原先跳转详情页
  * @author gouxinjie
  * @created 2026-11-25
- * @updated 2026-11-26
+ * @updated 2026-11-27
  */
 'use client';
 
@@ -15,8 +15,11 @@ import SmartImage from '@/components/commons/SmartImage';
 import { toSlotChips } from '@/lib/view';
 import {
   WEAPON_BAR_STAT_KEYS,
+  WEAPON_GRADE_NOTE,
   WEAPON_STAT_META,
   WEAPON_VALUE_ROW_KEYS,
+  weaponGradeLabel,
+  weaponGradeTextClass,
 } from '@/constants/weapon';
 import { IconRifle } from '@/components/commons/icons';
 import type { WeaponDetail, WeaponNumericKey } from '@/types/weapon';
@@ -83,6 +86,15 @@ export default function WeaponDrawer({ weapon, statMax, onClose }: WeaponDrawerP
                   <span className="num text-[11px] px-1.5 py-px rounded bg-accent/10 text-accent font-medium">
                     {weapon.caliber || '—'}
                   </span>
+                  {/* 社区分级：与口径胶囊同款，未定级不渲染 */}
+                  {weapon.grade > 0 && (
+                    <span
+                      className={`num text-[11px] px-1.5 py-px rounded bg-accent/10 font-medium ${weaponGradeTextClass(weapon.grade)}`}
+                      title={WEAPON_GRADE_NOTE}
+                    >
+                      {weaponGradeLabel(weapon.grade)}
+                    </span>
+                  )}
                 </div>
                 <p className="num text-[11px] text-muted mt-2 flex items-center gap-2">
                   <span>
@@ -204,6 +216,8 @@ export default function WeaponDrawer({ weapon, statMax, onClose }: WeaponDrawerP
             {/* 免责声明：与正文拉开层级，弱化到次要文字色 */}
             <p className="text-[11px] text-muted/80 leading-relaxed border-t border-edge/60 pt-3">
               面板数值来自官方数据源，不同来源枪械字段完整度略有差异。仅供参考，以游戏内实测为准。
+              <br />
+              武器分级为社区按基础属性与改装上限的划分，非官方数据，会随赛季平衡调整；未定级的枪械不展示等级徽标。
             </p>
           </div>
         </>

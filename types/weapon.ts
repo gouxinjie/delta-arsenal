@@ -62,6 +62,10 @@ export interface WeaponRow {
   slots: string;
   /** 数据来源标记 */
   source: string;
+  /** 是否赛季实战榜热门（1 热门 / 0 非热门，由 sync 按榜单 T0 口径写入） */
+  is_hot: number;
+  /** 社区分级 1-4（0 表示未定级，页面不展示徽标；真源见 constants/weapon-grades.json） */
+  grade: number;
 }
 
 /** 详情抽屉内展示的可用弹药摘要（由 AmmoRow 裁剪而来，避免重复声明字段） */
@@ -91,4 +95,8 @@ export interface WeaponDetail {
   slots: string[];
   /** 可用弹药 */
   ammo: WeaponAmmoBrief[];
+  /** 是否赛季实战榜热门武器（图鉴卡片展示 🔥 角标） */
+  hot: boolean;
+  /** 社区分级 1-4（0 表示未定级，不展示「N 级枪」徽标） */
+  grade: number;
 }

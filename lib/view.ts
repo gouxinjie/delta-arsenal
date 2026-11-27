@@ -4,13 +4,13 @@
  *              页面只负责取数，不再各自手写 map（此前 ammo / weapons / 详情页三处重复）。
  * @author gouxinjie
  * @created 2026-11-26
- * @updated 2026-11-26
+ * @updated 2026-11-27
  */
 
 import { parseAmmoEffects } from '@/lib/ammo-effects';
 import { parseJson } from '@/lib/json';
 import { SLOT_NAMES } from '@/constants/game';
-import { WEAPON_BAR_STAT_KEYS } from '@/constants/weapon';
+import { WEAPON_BAR_STAT_KEYS, WEAPON_HIGHLIGHT_THRESHOLDS } from '@/constants/weapon';
 import type { AmmoRow, AmmoView, AmmoWeaponBrief } from '@/types/ammo';
 import type { WeaponAmmoBrief, WeaponDetail, WeaponNumericKey, WeaponPanel, WeaponRow } from '@/types/weapon';
 
@@ -128,7 +128,26 @@ export function toWeaponDetail(row: WeaponRow, ammo: AmmoRow[]): WeaponDetail {
     panel: parseWeaponPanel(row.panel),
     slots: parseWeaponSlots(row.slots),
     ammo: ammo.map(toWeaponAmmoBrief),
+    hot: row.is_hot === 1,
+    // 旧库尚无 grade 列时 row.grade 为 undefined，统一按「未定级」处理
+    grade: row.grade ?? 0,
   };
+}
+
+/**
+ * 判断单个面板字段是否达到高亮阈值
+ * @description 阈值表（WEAPON_HIGHLIGHT_THRESHOLDS）逐项独立判定：任一字段达标即高亮该字段，
+ *              互不牵连；未配置阈值或字段缺省时返回 false，避免缺数据被误判
+ * @param panel - 武器面板
+ * @param key - 面板数值字段
+ * @returns true 表示该字段数值需要高亮
+ * @example isHighlightedStat({ fireRate: 750 }, 'fireRate') // true
+ */
+export function isHighlightedStat(panel: WeaponPanel, key: WeaponNumericKey): boolean {
+  const threshold = WEAPON_HIGHLIGHT_THRESHOLDS[key];
+  if (typeof threshold !== 'number') return false;
+  const value = panel[key];
+  return typeof value === 'number' && value >= threshold;
 }
 
 /**
@@ -146,4 +165,25 @@ export function computeStatMax(panels: WeaponPanel[]): Partial<Record<WeaponNume
     }
   }
   return max;
+}
+
+/**
+ * 按武器社区分级排序（1-4 级升序）
+ * @description 未定级（grade = 0，如手枪 / 特殊武器 / 待核对枪械）统一排到末尾，
+ *              避免它们占据列表头部；同一等级内保持入参原有次序（后端已按类别顺序 +
+ *              名称排好），使同档武器的相对位置稳定，不会每次构建抖动
+ * @param weapons - 待排序武器列表（不修改入参）
+ * @returns 排序后的新数组
+ * @example sortByWeaponGrade([{ grade: 0 }, { grade: 3 }, { grade: 1 }]) // 1, 3, 0
+ */
+export function sortByWeaponGrade<T extends { grade: number }>(weapons: T[]): T[] {
+  return weapons
+    .map((weapon, index) => ({ weapon, index }))
+    .sort((a, b) => {
+      // 未定级不参与等级比较，统一压在末尾（不能直接用 0，否则会排到一级枪前面）
+      const gradeA = a.weapon.grade > 0 ? a.weapon.grade : Number.MAX_SAFE_INTEGER;
+      const gradeB = b.weapon.grade > 0 ? b.weapon.grade : Number.MAX_SAFE_INTEGER;
+      return gradeA - gradeB || a.index - b.index;
+    })
+    .map(({ weapon }) => weapon);
 }

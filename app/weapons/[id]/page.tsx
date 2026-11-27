@@ -4,13 +4,20 @@
  *              面板刻度与图鉴抽屉共用 lib/view 的统计口径，弹药磁贴共用 commons/AmmoTile
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-26
+ * @updated 2026-11-27
  */
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAllWeapons, getAmmoOfWeapon, getRelatedWeapons, getWeapon } from '@/lib/db';
 import { computeStatMax, parseWeaponPanel, toSlotChips, toWeaponDetail } from '@/lib/view';
-import { WEAPON_BAR_STAT_KEYS, WEAPON_STAT_META, WEAPON_VALUE_ROW_KEYS } from '@/constants/weapon';
+import {
+  WEAPON_BAR_STAT_KEYS,
+  WEAPON_GRADE_NOTE,
+  WEAPON_STAT_META,
+  WEAPON_VALUE_ROW_KEYS,
+  weaponGradeLabel,
+  weaponGradeTextClass,
+} from '@/constants/weapon';
 import AmmoTile from '@/components/commons/AmmoTile';
 import SectionTitle from '@/components/commons/SectionTitle';
 import SmartImage from '@/components/commons/SmartImage';
@@ -32,7 +39,7 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
   if (!w) notFound();
 
   // 面板 / 槽位 JSON 的解析与弹药裁剪集中在 lib/view，与图鉴页共用同一口径
-  const { panel, slots, ammo } = toWeaponDetail(w, getAmmoOfWeapon(id));
+  const { panel, slots, ammo, grade } = toWeaponDetail(w, getAmmoOfWeapon(id));
   const related = getRelatedWeapons(w);
   // 进度条刻度：全库同字段最大值，与图鉴抽屉一致，避免两处百分比不可比
   const statMax = computeStatMax(getAllWeapons().map((row) => parseWeaponPanel(row.panel)));
@@ -89,6 +96,15 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
               <span className="num rounded bg-accent/10 px-1.5 py-px text-[11px] font-medium text-accent sm:text-xs">
                 {w.caliber || '—'}
               </span>
+              {/* 社区分级：非官方口径，未定级（grade=0）不渲染徽标 */}
+              {grade > 0 && (
+                <span
+                  className={`num rounded bg-accent/10 px-1.5 py-px text-[11px] font-medium sm:text-xs ${weaponGradeTextClass(grade)}`}
+                  title={WEAPON_GRADE_NOTE}
+                >
+                  {weaponGradeLabel(grade)}
+                </span>
+              )}
             </div>
 
             {/* 速览三格：弹药数 / 槽位数 / 开火模式，纯文字列表之前要读两屏才知道 */}
@@ -166,6 +182,8 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
         </div>
         <p className="mt-4 border-t border-edge/60 pt-3 text-[11px] leading-relaxed text-muted/80">
           面板数值来自官方数据源，不同来源枪械字段完整度略有差异。仅供参考，以游戏内实测为准。
+          <br />
+          武器分级为社区按基础属性与改装上限的划分，非官方数据，会随赛季平衡调整；未定级的枪械不展示等级徽标。
         </p>
       </section>
 

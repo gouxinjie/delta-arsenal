@@ -39,6 +39,24 @@ const SLOT_NAMES = JSON.parse(
   fs.readFileSync(path.join(ROOT, 'constants', 'slot-names.json'), 'utf-8')
 );
 
+// 武器社区分级（一级枪 ~ 四级枪）真源（constants/weapon-grades.json）。
+// 该分级是社区按「基础属性 + 改装上限」总结的实用划分，非官方品质系统，
+// 因此只在站内做辅助标注：未登记 / 非法等级的武器一律写 0，前端不展示徽标。
+const WEAPON_GRADES = JSON.parse(
+  fs.readFileSync(path.join(ROOT, 'constants', 'weapon-grades.json'), 'utf-8')
+);
+const GRADE_BY_ID = WEAPON_GRADES.grades ?? {};
+
+/**
+ * 查询武器社区分级
+ * @param {string} id - 武器 objectID
+ * @returns {number} 1-4 级；未登记或等级非法时返回 0（前端据此不展示徽标）
+ */
+function resolveGrade(id) {
+  const grade = Number(GRADE_BY_ID[id]);
+  return Number.isInteger(grade) && grade >= 1 && grade <= 4 ? grade : 0;
+}
+
 /**
  * 槽位编号列表去重并归一为字符串
  * @param {Array<{socket_id?: number, slotID?: string}>} sockets - DFD accessory 或 tierlist sockets
@@ -64,6 +82,25 @@ const SOURCES = {
   // 元数据源：数据集版本与上游同步时间，仅用于版本标注与变化检测，拉取失败不阻塞主流程
   provenance: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/provenance.json',
 };
+
+/**
+ * 实战榜单源：上游按「护甲档-弹药档」场景，给出每把武器在贴脸/近距/中距/远距各档的梯队（T0/T1/T2…）。
+ * 文件名含中文，必须 encodeURI 后再请求 jsDelivr（裸中文会被 CDN 判为无效 URL）。
+ */
+const RANKING_DATA_BASE = 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data';
+const RANKING_SCENARIOS = {
+  '护甲4弹药4': `${RANKING_DATA_BASE}/${encodeURI('榜单/护甲4弹药4-实战.json')}`,
+  '护甲4弹药5': `${RANKING_DATA_BASE}/${encodeURI('榜单/护甲4弹药5-实战.json')}`,
+  '护甲5弹药4': `${RANKING_DATA_BASE}/${encodeURI('榜单/护甲5弹药4-实战.json')}`,
+  '护甲5弹药5': `${RANKING_DATA_BASE}/${encodeURI('榜单/护甲5弹药5-实战.json')}`,
+  '护甲6弹药5': `${RANKING_DATA_BASE}/${encodeURI('榜单/护甲6弹药5-实战.json')}`,
+};
+
+/** 热门角标采用的主场景（最主流的对枪档位） */
+const HOT_SCENARIO = '护甲5弹药5';
+
+/** 命中即视为热门的梯队：任一距离档进入该列表即热门 */
+const HOT_TIERS = ['T0'];
 
 const TIER_BY_RARITY = { 白: 1, 绿: 2, 蓝: 3, 紫: 4, 橙: 5, 金: 5 };
 
@@ -207,6 +244,24 @@ const NAME_ALIAS = {
   马林: 'marlin', // 马林杠杆式步枪 vs Marlin杠杆步枪
 };
 
+/**
+ * 从实战榜单提取热门武器 id
+ * @description 榜单按配装条目给出 bands.<距离档>.tier，同一把枪可能有多条配装；
+ *              任一条目任距离档命中 HOT_TIERS 即视为该武器热门
+ * @param {object|null} ranking - 榜单 JSON（拉取失败为 null）
+ * @returns {Set<string>} 命中的 weapon_id 集合
+ */
+function collectHotWeaponIds(ranking) {
+  const hot = new Set();
+  for (const w of ranking?.weapons ?? []) {
+    const id = String(w.weapon_id ?? '');
+    if (!id) continue;
+    const hit = Object.values(w.bands ?? {}).some((band) => HOT_TIERS.includes(band?.tier));
+    if (hit) hot.add(id);
+  }
+  return hot;
+}
+
 async function main() {
   console.log('== 三角洲军械库 sync 开始 ==');
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -231,6 +286,15 @@ async function main() {
   } catch (e) {
     console.warn(`  [WARN] provenance 拉取失败，数据版本降级为未知: ${e.message}`);
   }
+  // 实战榜单：图鉴 🔥 热门角标依据；拉取失败仅降级为「无热门标记」，不阻塞主流程
+  let hotRanking = null;
+  try {
+    hotRanking = await fetchJSON('hot_ranking', RANKING_SCENARIOS[HOT_SCENARIO]);
+  } catch (e) {
+    console.warn(`  [WARN] 实战榜单拉取失败，热门标记降级为空: ${e.message}`);
+  }
+  const hotIds = collectHotWeaponIds(hotRanking);
+  console.log(`  [OK] ${HOT_SCENARIO} 实战榜热门武器 ${hotIds.size} 把（${HOT_TIERS.join('/')}）`);
   // 归一化名称 -> 官方 tier 记录（weapon_id 与口径均以官方为准）
   // 同一武器在 tier 表可能有多条记录（同 id 多品阶），已核实：归一名称命中多条时 id 与口径均唯一，直接覆盖结果一致
   const TIER_BY_NAME = new Map(
@@ -527,6 +591,30 @@ async function main() {
     console.warn('  [WARN] 旧库 counts 解析失败，跳过数量比对');
   }
 
+  // 榜单热门但本站未收录的武器（如上游新枪尚未进入主源）只提示、不落库，避免热门 id 悬空
+  const hotMissing = [...hotIds].filter((id) => !weaponIdSet.has(id));
+  if (hotMissing.length) {
+    console.warn(`  [WARN] ${hotMissing.length} 把榜单热门武器未收录，已忽略: ${hotMissing.join(', ')}`);
+  }
+
+  // 武器分级表校验：id 必须能对上入库武器、等级必须为 1-4。
+  // 分级属于社区口径的附加标注（写错只会错标 / 漏标），因此只告警不阻塞同步，
+  // 但必须提示出来——上游改 id 或枪名下架时，映射表会静默失效。
+  const gradeIds = Object.keys(GRADE_BY_ID);
+  const unknownGradeIds = gradeIds.filter((id) => !weaponIdSet.has(id));
+  const invalidGradeIds = gradeIds.filter((id) => {
+    const grade = Number(GRADE_BY_ID[id]);
+    return !(Number.isInteger(grade) && grade >= 1 && grade <= 4);
+  });
+  if (unknownGradeIds.length) {
+    console.warn(`  [WARN] 分级表有 ${unknownGradeIds.length} 个 id 未收录，已忽略: ${unknownGradeIds.join(', ')}`);
+  }
+  if (invalidGradeIds.length) {
+    console.warn(`  [WARN] 分级表有 ${invalidGradeIds.length} 个等级不合法（应为 1-4）: ${invalidGradeIds.join(', ')}`);
+  }
+  const gradedCount = gradeIds.filter((id) => weaponIdSet.has(id) && resolveGrade(id) > 0).length;
+  console.log(`  [OK] 武器分级已标注 ${gradedCount} / ${weapons.length} 把（未登记项不展示徽标）`);
+
   // ---- 5. 写入 SQLite（全量重建）----
   // 优先删库重建；库文件被占用（如开发服务器持有只读连接）时退化为就地重建，
   // 避免因文件锁导致整次同步失败。
@@ -556,7 +644,7 @@ async function main() {
     );
     CREATE TABLE weapons (
       id TEXT PRIMARY KEY, name TEXT, category TEXT, caliber TEXT,
-      image TEXT,
+      image TEXT, is_hot INTEGER DEFAULT 0, grade INTEGER DEFAULT 0,
       panel TEXT, slots TEXT, source TEXT, updated_at TEXT
     );
     CREATE TABLE ammo_weapons (
@@ -571,12 +659,12 @@ async function main() {
 
   const now = new Date().toISOString();
   const insAmmo = db.prepare(`INSERT INTO ammo VALUES (@id,@name,@caliber,@tier,@rarity,@pen_level,@dmg_ratio,@armor_ratio,@matrix,@effects,@season_limited,@note,@updated_at)`);
-  const insWeapon = db.prepare(`INSERT INTO weapons VALUES (@id,@name,@category,@caliber,@image,@panel,@slots,@source,@updated_at)`);
+  const insWeapon = db.prepare(`INSERT INTO weapons VALUES (@id,@name,@category,@caliber,@image,@is_hot,@grade,@panel,@slots,@source,@updated_at)`);
   const insAW = db.prepare(`INSERT OR IGNORE INTO ammo_weapons VALUES (@ammo_id,@weapon_id)`);
 
   db.transaction(() => {
     for (const a of ammoRows) insAmmo.run({ ...a, matrix: JSON.stringify(a.matrix), effects: JSON.stringify(a.effects), updated_at: now });
-    for (const w of weapons) insWeapon.run({ ...w, panel: JSON.stringify(w.panel), slots: JSON.stringify(w.slots), updated_at: now });
+    for (const w of weapons) insWeapon.run({ ...w, is_hot: hotIds.has(w.id) ? 1 : 0, grade: resolveGrade(w.id), panel: JSON.stringify(w.panel), slots: JSON.stringify(w.slots), updated_at: now });
     for (const r of ammoWeapons) insAW.run(r);
     const meta = {
       generatedAt: now,
@@ -587,6 +675,12 @@ async function main() {
       datasetSyncedAt,
       // 弹药关键字段指纹（id + 穿透等级 + 穿透矩阵），跨次同步变化检测用
       ammoFingerprint: ammoFp,
+      // 热门角标判定依据：前端据此标注「哪个场景 / 什么口径」，避免写死文案
+      hotScenario: HOT_SCENARIO,
+      hotRule: `任一距离档 ${HOT_TIERS.join('/')}`,
+      hotCount: String(hotIds.size),
+      // 武器社区分级的覆盖数：页面据此说明「部分枪械未定级」，避免用户以为漏收录
+      gradeCount: String(gradedCount),
       sources: JSON.stringify(Object.values(SOURCES).concat('delta-force-core@0.8.0')),
       counts: JSON.stringify(nextCounts),
     };

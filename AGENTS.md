@@ -49,7 +49,7 @@ pnpm run lint       # ESLint
 app/                  Next.js 路由
 components/commons/   公共组件（每组件独立文件夹 + index.tsx）
 hooks/                通用前端行为 Hook（useOverlay 等）
-constants/            游戏与站点常量（caliber-icons.json 为口径图标真源；weapon-aliases.json 为武器别名真源，均由 sync 消费）
+constants/            游戏与站点常量（caliber-icons.json 为口径图标真源；weapon-aliases.json 为武器别名真源；weapon-grades.json 为武器 1-4 级社区分级真源，均由 sync 消费）
 lib/                  数据库读取层（db.ts，全部带 JSDoc）
 scripts/              sync.mjs 等脚本
 data/                 delta.db（入库，勿手改；重建走 pnpm run sync）
@@ -67,8 +67,9 @@ UI/                   设计稿参考图
 3. 数字/口径一律等宽字体
 4. 页面必须带数据版本标注（读 `meta` 表）与「非官方」声明
 5. 穿甲矩阵三色判定规则以 PRD 4.1 为准，页面需标注「仅供参考，以游戏内实测为准」
-6. 不做：用户系统、评论、交易行实时价格（API 已停运）、地图点位
-7. 提交前清理 console.log 与未使用 import（用户习惯）
+6. 武器 1-4 级是**社区口径**（按基础属性 + 改装上限的实用划分），**不是官方品质系统**，页面文案不得写成官方分级；真源 `constants/weapon-grades.json`，未登记武器 `grade=0`、不展示徽标
+7. 不做：用户系统、评论、交易行实时价格（API 已停运）、地图点位
+8. 提交前清理 console.log 与未使用 import（用户习惯）
 
 ---
 
