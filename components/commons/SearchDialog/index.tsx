@@ -1,15 +1,16 @@
 /**
  * @component SearchDialog
- * @description 全局搜索弹窗（命令面板式）：模糊匹配武器 / 弹药 / 口径，↑↓ 选择、Enter 直达、Esc 关闭、Ctrl/⌘ + K 唤起；
- *              结果按武器 / 弹药分组并高亮命中片段，空态给数据驱动的热门口径快捷入口；
+ * @description 全局搜索弹窗（命令面板式）：模糊匹配武器 / 弹药 / 口径 / 武器别名，↑↓ 选择、Enter 直达、Esc 关闭、Ctrl/⌘ + K 唤起；
+ *              结果按武器 / 弹药分组（各有展示配额，避免口径检索时单类被另一类挤掉）并高亮命中片段，
+ *              别名命中仍展示官方枪名（如「维克托」→ Vector冲锋枪），空态给数据驱动的热门口径快捷入口；
  *              索引从 /search-index.json 懒加载（首次打开时请求），带加载骨架 / 失败重试状态
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-26
+ * @updated 2026-11-27
  */
 'use client';
 
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
@@ -34,6 +35,21 @@ interface SearchItem {
   tier?: number | null;
   /** 类别（仅武器） */
   category?: string;
+  /** 别名（仅武器）：玩家口语 / 英文原名，来自 constants/weapon-aliases.json */
+  alias?: string[];
+}
+
+/** 命中字段：决定高亮哪一列，别名与类别命中时名称本身并不含关键词 */
+type HitKind = 'name' | 'alias' | 'caliber' | 'category';
+
+/** 带命中信息的搜索结果（分组、键盘遍历、渲染都以它为单位） */
+interface Hit {
+  /** 索引条目 */
+  item: SearchItem;
+  /** 得分，越小越靠前 */
+  score: number;
+  /** 命中字段 */
+  kind: HitKind;
 }
 
 /** 索引加载状态 */
@@ -42,8 +58,15 @@ type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 /** 搜索结果条数上限：超出后用户应细化关键词，页脚会提示真实匹配总数 */
 const MAX_RESULTS = 12;
 
+/**
+ * 单一类型的展示配额：口径这类「武器和弹药都会命中」的关键词，
+ * 只按分数排序会让数量多的一类占满全部名额（实测搜 7.62 时 12 条全是武器、弹药不可见）
+ */
+const GROUP_QUOTA = 6;
+
 /** 空态展示的热门口径条数 */
 const MAX_SUGGESTIONS = 6;
+
 
 /**
  * 结果条目唯一键（武器与弹药的 id 分属不同命名空间，必须带类型前缀）
@@ -101,19 +124,71 @@ function highlight(text: string, keyword: string): ReactNode {
 function normalizeIndex(raw: unknown): SearchItem[] {
   if (!raw || typeof raw !== 'object') return [];
   const { ammo, weapons } = raw as { ammo?: unknown; weapons?: unknown };
-  const pick = (list: unknown, type: SearchItem['type']): SearchItem[] =>
-    Array.isArray(list)
-      ? list.filter(
-          (item): item is SearchItem =>
-            !!item &&
-            typeof item === 'object' &&
-            (item as SearchItem).type === type &&
-            typeof (item as SearchItem).id === 'string' &&
-            typeof (item as SearchItem).name === 'string' &&
-            typeof (item as SearchItem).caliber === 'string'
-        )
-      : [];
+
+  /**
+   * 解析单类条目：必需字段缺失直接丢弃，可选字段逐个校验后透传
+   * @param list - 原始数组
+   * @param type - 期望的类型（与所在数组一致才收）
+   * @returns 规范化后的条目
+   */
+  const pick = (list: unknown, type: SearchItem['type']): SearchItem[] => {
+    if (!Array.isArray(list)) return [];
+    return list.flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') return [];
+      const item = entry as Partial<SearchItem>;
+      if (
+        item.type !== type ||
+        typeof item.id !== 'string' ||
+        typeof item.name !== 'string' ||
+        typeof item.caliber !== 'string'
+      ) {
+        return [];
+      }
+      const alias = Array.isArray(item.alias)
+        ? item.alias.filter((text): text is string => typeof text === 'string' && text.trim() !== '')
+        : [];
+      return [
+        {
+          type,
+          id: item.id,
+          name: item.name,
+          caliber: item.caliber,
+          ...(typeof item.pen === 'number' ? { pen: item.pen } : {}),
+          ...(typeof item.tier === 'number' || item.tier === null ? { tier: item.tier } : {}),
+          ...(typeof item.category === 'string' ? { category: item.category } : {}),
+          ...(alias.length ? { alias } : {}),
+        },
+      ];
+    });
+  };
   return [...pick(weapons, 'weapon'), ...pick(ammo, 'ammo')];
+}
+
+/**
+ * 按类型配额截取结果：先给每类最多 GROUP_QUOTA 条，名额没用满再按分数补齐
+ * @description 两层遍历都按分数升序遍历，因此同一分组内的相对顺序仍是「分数优先」
+ * @param scored - 已按得分升序排好的命中项
+ * @returns 不超过 MAX_RESULTS 条的展示列表
+ */
+function limitByGroup(scored: Hit[]): Hit[] {
+  const picked: Hit[] = [];
+  const used = new Map<SearchItem['type'], number>();
+  for (const hit of scored) {
+    if (picked.length >= MAX_RESULTS) return picked;
+    const count = used.get(hit.item.type) ?? 0;
+    if (count >= GROUP_QUOTA) continue;
+    used.set(hit.item.type, count + 1);
+    picked.push(hit);
+  }
+  if (picked.length >= MAX_RESULTS) return picked;
+  // 某一类命中不足配额时把剩余名额还给另一类，单类检索不会被压到 6 条
+  const taken = new Set(picked.map((hit) => keyOf(hit.item)));
+  for (const hit of scored) {
+    if (picked.length >= MAX_RESULTS) break;
+    if (taken.has(keyOf(hit.item))) continue;
+    picked.push(hit);
+  }
+  return picked;
 }
 
 export default function SearchDialog() {
@@ -125,9 +200,9 @@ export default function SearchDialog() {
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   /** 选项节点引用：键盘移动后把选中行滚进可视区 */
-  const optionRefs = useRef<(HTMLLIElement | null)[]>([]);
+  const optionRefs = useRef<(HTMLDivElement | null)[]>([]);
   /** 结果滚动容器：换关键词时把滚动位置拉回顶部，避免停留在上一轮结果的中段 */
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const router = useRouter();
   const pathname = usePathname();
@@ -166,7 +241,11 @@ export default function SearchDialog() {
       })
       .then((data) => {
         if (!aliveRef.current) return;
-        setItems(normalizeIndex(data));
+        const list = normalizeIndex(data);
+        // 空索引只有「sync 没跑」或「字段改了」两种可能：按失败处理，否则界面会显示「已索引 0 把武器」，
+        // 用户只会以为站内没数据，连重试入口都没有
+        if (!list.length) throw new Error('搜索索引为空或字段格式不符');
+        setItems(list);
         statusRef.current = 'ready';
         setStatus('ready');
       })
@@ -187,6 +266,8 @@ export default function SearchDialog() {
   // 全局快捷键：Ctrl + K / ⌘ + K 唤起或关闭（与按钮上的键帽提示保持一致）
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      // 中文输入法组合期间按键不算快捷键，否则会打断正在拼写的输入
+      if (event.isComposing) return;
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'k') return;
       event.preventDefault();
       if (open) close();
@@ -207,31 +288,44 @@ export default function SearchDialog() {
   const keyword = q.trim().toLowerCase();
 
   /**
-   * 匹配结果：名称前缀 > 名称包含 > 口径包含 > 类别包含；
+   * 匹配结果：名称前缀 > 名称包含 > 别名包含 > 口径包含 > 类别包含；
    * total 保留真实命中数，用于页脚提示「还有更多，需细化关键词」
    */
   const matched = useMemo(() => {
-    if (!keyword) return { list: [] as SearchItem[], total: 0 };
-    const scored = items
-      .map((item) => {
-        const name = item.name.toLowerCase();
-        if (name.startsWith(keyword)) return { item, score: 0 };
-        if (name.includes(keyword)) return { item, score: 1 };
-        if (item.caliber.toLowerCase().includes(keyword)) return { item, score: 2 };
-        if ((item.category ?? '').toLowerCase().includes(keyword)) return { item, score: 3 };
-        return null;
-      })
-      .filter((hit): hit is { item: SearchItem; score: number } => hit !== null);
+    if (!keyword) return { list: [] as Hit[], total: 0 };
+    const scored: Hit[] = [];
+    for (const item of items) {
+      const name = item.name.toLowerCase();
+      if (name.startsWith(keyword)) {
+        scored.push({ item, score: 0, kind: 'name' });
+        continue;
+      }
+      if (name.includes(keyword)) {
+        scored.push({ item, score: 1, kind: 'name' });
+        continue;
+      }
+      if (item.alias?.some((alias) => alias.toLowerCase().includes(keyword))) {
+        scored.push({ item, score: 2, kind: 'alias' });
+        continue;
+      }
+      if (item.caliber.toLowerCase().includes(keyword)) {
+        scored.push({ item, score: 3, kind: 'caliber' });
+        continue;
+      }
+      if ((item.category ?? '').toLowerCase().includes(keyword)) {
+        scored.push({ item, score: 4, kind: 'category' });
+      }
+    }
     scored.sort((a, b) => a.score - b.score);
-    return { list: scored.slice(0, MAX_RESULTS).map((hit) => hit.item), total: scored.length };
+    return { list: limitByGroup(scored), total: scored.length };
   }, [keyword, items]);
 
   /** 展示用的分组：顺序即键盘遍历顺序（武器在前、弹药在后） */
   const groups = useMemo(
     () =>
       [
-        { type: 'weapon' as const, label: '武器', list: matched.list.filter((item) => item.type === 'weapon') },
-        { type: 'ammo' as const, label: '弹药', list: matched.list.filter((item) => item.type === 'ammo') },
+        { type: 'weapon' as const, label: '武器', list: matched.list.filter((hit) => hit.item.type === 'weapon') },
+        { type: 'ammo' as const, label: '弹药', list: matched.list.filter((hit) => hit.item.type === 'ammo') },
       ].filter((group) => group.list.length > 0),
     [matched.list]
   );
@@ -240,11 +334,11 @@ export default function SearchDialog() {
   const flat = useMemo(() => groups.flatMap((group) => group.list), [groups]);
 
   /** 条目键 -> 线性下标，渲染时避免 O(n²) 查找 */
-  const indexOf = useMemo(() => new Map(flat.map((item, index) => [keyOf(item), index])), [flat]);
+  const indexOf = useMemo(() => new Map(flat.map((hit, index) => [keyOf(hit.item), index])), [flat]);
 
   /** 结果集变化（如索引刚加载完）时下标可能越界，读取时统一夹紧 */
   const activeIndex = flat.length ? Math.min(active, flat.length - 1) : -1;
-  const activeItem = activeIndex >= 0 ? flat[activeIndex] : undefined;
+  const activeHit = activeIndex >= 0 ? flat[activeIndex] : undefined;
 
   // 键盘移动后把选中行滚进可视区（block: nearest 已可见时不滚动）
   useEffect(() => {
@@ -307,9 +401,9 @@ export default function SearchDialog() {
 
   // 键盘选中项变化时同步预取：Enter 落下之前目标路由已经就绪
   useEffect(() => {
-    if (!open || !activeItem) return;
-    prefetch(activeItem);
-  }, [open, activeItem, prefetch]);
+    if (!open || !activeHit) return;
+    prefetch(activeHit.item);
+  }, [open, activeHit, prefetch]);
 
   /**
    * 跳转到目标详情：弹药带 id 精确命中（按名称模糊检索会在 M855 / M855A1 这类同前缀弹种上选错）
@@ -338,7 +432,7 @@ export default function SearchDialog() {
     }
     if (event.key === 'Enter') {
       event.preventDefault();
-      if (activeItem) go(activeItem);
+      if (activeHit) go(activeHit.item);
     }
   };
 
@@ -394,11 +488,11 @@ export default function SearchDialog() {
             aria-modal="true"
             aria-label="搜索武器或弹药"
             tabIndex={-1}
-            className="tac-panel w-full max-w-xl overflow-hidden anim-slide outline-none [box-shadow:var(--modal-shadow)]"
+            className="tac-panel tac-panel-plain w-full max-w-xl overflow-hidden rounded-xl p-2 anim-slide outline-none [box-shadow:var(--modal-shadow)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* 输入区：聚焦时放大镜与底边一起转强调色，明确「输入中」 */}
-            <div className="group flex items-center gap-2 border-b border-edge px-3 transition-colors focus-within:border-accent">
+            <div className="group flex items-center gap-2 border-b border-edge px-2 transition-colors focus-within:border-accent">
               <IconSearch className="w-4 h-4 shrink-0 text-muted transition-colors group-focus-within:text-accent" />
               <input
                 ref={inputRef}
@@ -413,8 +507,8 @@ export default function SearchDialog() {
                 aria-autocomplete="list"
                 aria-expanded={groups.length > 0}
                 aria-controls={groups.length > 0 ? listId : undefined}
-                aria-activedescendant={activeItem ? `${listId}-opt-${activeIndex}` : undefined}
-                placeholder="输入枪名、弹名或口径，如：M4 / M995 / 5.56"
+                aria-activedescendant={activeHit ? `${listId}-opt-${activeIndex}` : undefined}
+                placeholder="输入枪名、别名、弹名或口径，如：M4 / 维克托 / M995"
                 className="w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted"
               />
               {q && (
@@ -430,9 +524,10 @@ export default function SearchDialog() {
               <kbd className="key-chip hidden shrink-0 sm:inline">Esc</kbd>
             </div>
 
-            {/* 结果区：窄屏限制高度，避免软键盘弹出后撑出屏幕；分组标题吸顶便于长列表定位 */}
+            {/* 结果区：窄屏限制高度，避免软键盘弹出后撑出屏幕；分组标题吸顶便于长列表定位。
+                结构为 listbox > group > option，分组标题用 presentation，避免被读屏算成可选项 */}
             {groups.length > 0 && (
-              <ul
+              <div
                 ref={listRef}
                 id={listId}
                 role="listbox"
@@ -440,21 +535,24 @@ export default function SearchDialog() {
                 className="max-h-[50dvh] overflow-y-auto py-1 sm:max-h-80"
               >
                 {groups.map((group) => (
-                  <Fragment key={group.type}>
-                    <li
+                  <div key={group.type} role="group" aria-label={group.label}>
+                    <div
                       role="presentation"
                       className="sticky top-0 z-10 flex items-baseline justify-between border-b border-edge bg-panel-hi px-3 py-1.5"
                     >
                       <span className="text-[10px] tracking-[0.18em] text-muted">{group.label}</span>
                       <span className="num text-[10px] text-muted">{group.list.length}</span>
-                    </li>
-                    {group.list.map((item) => {
-                      const index = indexOf.get(keyOf(item)) ?? 0;
+                    </div>
+                    {group.list.map((hit) => {
+                      const { item } = hit;
+                      const index = indexOf.get(keyOf(item));
+                      // 键不在线性表里说明渲染数据与 flat 不同步：宁可少画一条，也不要用错误的兜底下标高亮别的行
+                      if (index === undefined) return null;
                       const selected = index === activeIndex;
                       /** 弹药穿透徽章配色；武器没有徽章，不参与取色 */
                       const tone = item.type === 'ammo' ? penTone(item.pen, item.tier) : '';
                       return (
-                        <li
+                        <div
                           key={keyOf(item)}
                           id={`${listId}-opt-${index}`}
                           role="option"
@@ -480,7 +578,10 @@ export default function SearchDialog() {
                               selected ? 'bg-accent' : 'bg-transparent'
                             }`}
                           />
-                          <span className="min-w-0 flex-1 truncate text-sm">{highlight(item.name, keyword)}</span>
+                          {/* 名称列：只有名称命中才高亮；别名命中时名称本身不含关键词，避免出现「无高亮却被选中」的错觉 */}
+                          <span className="min-w-0 flex-1 truncate text-sm">
+                            {hit.kind === 'name' ? highlight(item.name, keyword) : item.name}
+                          </span>
                           {item.type === 'ammo' && item.pen !== undefined && (
                             <span
                               className="num shrink-0 rounded-[3px] px-1.5 py-0.5 text-[10px]"
@@ -492,15 +593,16 @@ export default function SearchDialog() {
                               穿 {item.pen}
                             </span>
                           )}
+                          {/* 口径列：按口径命中时在这里高亮，否则用户看不出为什么命中 */}
                           <span className="num max-w-[6.5rem] shrink-0 truncate text-right text-xs text-muted">
-                            {item.caliber}
+                            {hit.kind === 'caliber' ? highlight(item.caliber, keyword) : item.caliber}
                           </span>
-                        </li>
+                        </div>
                       );
                     })}
-                  </Fragment>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
 
             {/* 加载 / 失败 / 空态：不放进 listbox，空态含可聚焦按钮，塞进 listbox 会破坏 ARIA 结构 */}
@@ -516,7 +618,7 @@ export default function SearchDialog() {
 
                 {status === 'error' && (
                   <div className="px-3 py-6 text-center">
-                    <p className="text-sm text-danger">搜索索引加载失败，请检查网络后重试</p>
+                    <p className="text-sm text-danger">搜索索引不可用，请检查网络后重试</p>
                     <button
                       type="button"
                       onClick={loadIndex}
@@ -568,7 +670,7 @@ export default function SearchDialog() {
             {/* 页脚：左侧结果计数（读屏播报），右侧键位提示（触屏隐藏）；
                 触屏且无计数时整条隐藏，避免空态/空结果下多出一条无信息量的分隔带 */}
             <div
-              className={`items-center gap-2 border-t border-edge px-3 py-2 text-[11px] text-muted ${
+              className={`items-center gap-2 border-t border-edge px-2 py-2 text-[11px] text-muted ${
                 countText ? 'flex' : 'hidden sm:flex'
               }`}
             >

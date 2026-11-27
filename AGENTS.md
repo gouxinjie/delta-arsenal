@@ -49,7 +49,7 @@ pnpm run lint       # ESLint
 app/                  Next.js 路由
 components/commons/   公共组件（每组件独立文件夹 + index.tsx）
 hooks/                通用前端行为 Hook（useOverlay 等）
-constants/            游戏与站点常量（caliber-icons.json 为口径图标真源，前端与 sync 共用）
+constants/            游戏与站点常量（caliber-icons.json 为口径图标真源；weapon-aliases.json 为武器别名真源，均由 sync 消费）
 lib/                  数据库读取层（db.ts，全部带 JSDoc）
 scripts/              sync.mjs 等脚本
 data/                 delta.db（入库，勿手改；重建走 pnpm run sync）

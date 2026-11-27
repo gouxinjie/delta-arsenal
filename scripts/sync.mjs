@@ -25,6 +25,13 @@ const CALIBER_ICON_FILES = JSON.parse(
   fs.readFileSync(path.join(ROOT, 'constants', 'caliber-icons.json'), 'utf-8')
 );
 
+// 武器别名表：玩家口语 / 英文原名 -> 官方枪名（constants/weapon-aliases.json）。
+// 官方枪名本身可能搜不到口语叫法（如「维克托」搜不到 Vector冲锋枪），别名随索引一起下发，
+// 前端命中别名时仍展示官方枪名，避免出现站内不存在的枪名。
+const WEAPON_ALIASES = JSON.parse(
+  fs.readFileSync(path.join(ROOT, 'constants', 'weapon-aliases.json'), 'utf-8')
+);
+
 const SOURCES = {
   guns: 'https://cdn.jsdelivr.net/gh/jiansenc/DeltaForceData@main/public/json/gun/gunRifle.json',
   ammo: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/ammo.json',
@@ -638,10 +645,23 @@ async function main() {
   fs.mkdirSync(PUBLIC_DIR, { recursive: true });
   const searchIndex = {
     ammo: ammoRows.map((a) => ({ type: 'ammo', id: a.id, name: a.name, caliber: a.caliber, pen: a.pen_level, tier: a.tier })),
-    weapons: weapons.map((w) => ({ type: 'weapon', id: w.id, name: w.name, caliber: w.caliber, category: w.category })),
+    weapons: weapons.map((w) => {
+      const alias = WEAPON_ALIASES[w.name] ?? [];
+      return {
+        type: 'weapon', id: w.id, name: w.name, caliber: w.caliber, category: w.category,
+        // 无别名时不写字段，索引体积与前端 normalize 的判空都更简单
+        ...(alias.length ? { alias } : {}),
+      };
+    }),
   };
   fs.writeFileSync(path.join(PUBLIC_DIR, 'search-index.json'), JSON.stringify(searchIndex));
   console.log(`  搜索索引: ${searchIndex.ammo.length + searchIndex.weapons.length} 条`);
+  // 别名以官方枪名为键：上游改名后条目会静默失效，必须告警提醒维护别名表
+  const indexedNames = new Set(weapons.map((w) => w.name));
+  const orphanAliasKeys = Object.keys(WEAPON_ALIASES).filter((name) => !indexedNames.has(name));
+  if (orphanAliasKeys.length) {
+    console.warn(`  [WARN] 别名表存在未匹配的官方枪名: ${orphanAliasKeys.join('、')}`);
+  }
 
   // ---- 6. 汇总 ----
   const caliberDist = {};
