@@ -1,10 +1,10 @@
 /**
  * @page Builds
  * @description 改枪码页：烽火地带 / 全面战场的玩家改枪方案，按价格排序并支持一键复制；
- *              数据来自人工维护的 constants/build-codes.json，构建期关联武器图鉴的图片与面板
+ *              数据来自运行时数据库 data/builds.db（人工录入），渲染时关联武器图鉴的图片与口径
  * @author gouxinjie
  * @created 2026-11-27
- * @updated 2026-11-27
+ * @updated 2026-11-27（改为 ISR：录入后接口 revalidatePath 立即刷新）
  */
 
 import BuildCodeBrowser from '@/components/commons/BuildCodeBrowser';
@@ -26,11 +26,18 @@ export const metadata = {
     '三角洲行动改枪码大全：烽火地带主流改枪方案，含改装总价与面板数值，一键复制进游戏载入。非官方玩家整理，随版本更新可能失效。',
 };
 
+/**
+ * 页面缓存策略
+ * @description 录入接口写入后会调用 revalidatePath 立即失效，这里的 60 秒只是兜底：
+ *              防止漏掉失效调用时数据长期不更新
+ */
+export const revalidate = 60;
+
 export default function BuildsPage() {
-  // 方案与统计都在构建期算好：页面为静态 HTML，客户端只负责筛选与复制
+  // 方案与统计在渲染时算好并缓存 60 秒：客户端只负责筛选与复制
   const builds = getBuildCodes();
   const summary = getBuildCodeSummary();
-  // 抽屉内录入器所需数据：构建期一次性取好随页面下发，打开抽屉不再请求接口
+  // 抽屉内录入器所需数据：渲染时一次性取好随页面下发，打开抽屉不再请求接口
   const weapons = getBuildWeaponOptions();
   const existing = getBuildCodeRecords();
   const scenarioText = BUILD_SCENARIOS.map(

@@ -328,6 +328,9 @@ function MatrixPreview() {
   );
 }
 
+/** 首页缓存：改枪码数量随录入变化，5 分钟内自动跟上；写入接口也会显式失效 */
+export const revalidate = 300;
+
 export default function Home() {
   // 元信息解析 / 计数与日期兜底集中在 lib/site-meta（与页脚共用），数据库缺失时各字段显示「—」
   const { counts, season, datasetVersion, updatedAt, sourcesRaw } = getSiteMeta();

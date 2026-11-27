@@ -544,6 +544,19 @@ select,
   touch-action: manipulation;
 }
 
+/**
+ * 可点击控件统一手型指针。
+ * Tailwind v4 的 preflight 移除了 button 的 cursor: pointer（回归浏览器默认箭头），
+ * 若不在基础层补回，全站按钮鼠标悬停都是箭头，只有个别手写了 cursor-pointer 类的地方才对。
+ * 禁用态排除在外：各组件用 disabled:cursor-not-allowed 自行声明。
+ */
+button:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
 @media (max-width: 767px) {
   /* 移动端头部 = 主行 56px + 二级导航约 44px（滚动条另计） */
   html {

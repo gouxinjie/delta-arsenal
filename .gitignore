@@ -3,6 +3,8 @@ tmp/
 data/*.db-journal
 data/*.db-shm
 data/*.db-wal
+# 运行时数据库：人工录入的改枪码，不入库（首次启动自动建库并从 constants/build-codes.json 播种）
+data/builds.db
 .next/
 .env*
 # 环境变量模板需要入库，供他人照抄（上面 .env* 会把它一起忽略）

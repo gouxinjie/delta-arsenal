@@ -1,30 +1,23 @@
 /**
- * 改枪码读取与补全（构建期执行）
- * @description 数据真源为 constants/build-codes.json（人工维护），本模块负责：
+ * 改枪码读取与补全（构建期 + 运行时共用）
+ * @description 数据真源为运行时数据库 data/builds.db（见 lib/builds-db），
+ *              constants/build-codes.json 退化为首次播种的种子与人工备份。本模块负责：
  *              1. 按枪名 / 别名把方案关联到 weapons 表，补齐图片、口径与类别；
- *              2. 过滤非法记录并留下构建日志，避免脏数据让整页构建失败。
+ *              2. 过滤非法记录并留下日志，避免脏数据让整页渲染失败。
  *              面板参数不在改枪码模块重复展示（统一由武器图鉴承载）；
- *              改枪码不进 SQLite，sync 重建数据库不会覆盖已整理的内容。
+ *              改枪码不进 delta.db，sync 重建数据库不会覆盖已录入的内容。
  * @author gouxinjie
  * @created 2026-11-27
- * @updated 2026-11-27
+ * @updated 2026-11-27（数据源由静态 JSON 改为运行时 builds.db）
  */
 
-import BUILD_CODE_FILE from '@/constants/build-codes.json';
 import ALIAS_FILE from '@/constants/weapon-aliases.json';
 import { BUILD_SCENARIOS, normalizeBuildTags } from '@/constants/build-code';
+import { getBuildsUpdatedAt, listBuildRecords } from '@/lib/builds-db';
 import { getAllWeapons } from '@/lib/db';
 import { normalizeWeaponName, shortWeaponName } from '@/lib/weapon-name';
-import type {
-  BuildCodeFile,
-  BuildCodeRecord,
-  BuildCodeView,
-  BuildWeaponOption,
-} from '@/types/build-code';
+import type { BuildCodeRecord, BuildCodeView, BuildWeaponOption } from '@/types/build-code';
 import type { WeaponRow } from '@/types/weapon';
-
-/** 数据文件（JSON 静态导入，构建期读取，运行时不产生 IO） */
-const DATA = BUILD_CODE_FILE as BuildCodeFile;
 
 /** 别名 -> 官方枪名（键为归一后的别名，来自 constants/weapon-aliases.json） */
 const ALIAS_TO_NAME: Record<string, string> = Object.entries(
@@ -63,8 +56,9 @@ function resolveWeapon(query: string, weapons: WeaponRow[]): WeaponRow | null {
  * 校验并归一单条记录
  * @param record - 原始记录
  * @returns 归一后的记录；必填字段缺失或场景非法时返回 null
+ * @description 同时供写入接口复用，保证「入库」与「读取」走同一套口径
  */
-function normalizeRecord(record: BuildCodeRecord): BuildCodeRecord | null {
+export function normalizeRecord(record: BuildCodeRecord): BuildCodeRecord | null {
   if (!record || typeof record.id !== 'string' || !record.id.trim()) return null;
   if (typeof record.weapon !== 'string' || !record.weapon.trim()) return null;
   if (typeof record.code !== 'string' || !record.code.trim()) return null;
@@ -87,14 +81,14 @@ function normalizeRecord(record: BuildCodeRecord): BuildCodeRecord | null {
 }
 
 /**
- * 读取数据文件中的全部合法记录（不含数据库解析，供录入页导出时合并使用）
- * @returns 按文件顺序排列的记录；非法记录跳过并打印构建日志
+ * 读取全部合法记录（不含武器解析，供录入页与写接口使用）
+ * @returns 按写入顺序排列的记录；非法记录跳过并打印日志
  */
 export function getBuildCodeRecords(): BuildCodeRecord[] {
   const records: BuildCodeRecord[] = [];
   const usedIds = new Set<string>();
 
-  for (const raw of Array.isArray(DATA.items) ? DATA.items : []) {
+  for (const raw of listBuildRecords()) {
     const record = normalizeRecord(raw);
     if (!record) {
       console.warn('[build-codes] 记录缺少必填字段（id / weapon / scenario / code），已跳过', raw);
@@ -213,5 +207,5 @@ export function getBuildCodeSummary(): BuildCodeSummary {
     byScenario[record.scenario] = (byScenario[record.scenario] ?? 0) + 1;
   }
 
-  return { total: records.length, byScenario, updatedAt: DATA.updatedAt?.trim() ?? '' };
+  return { total: records.length, byScenario, updatedAt: getBuildsUpdatedAt() };
 }

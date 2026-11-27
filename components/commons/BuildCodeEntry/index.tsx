@@ -1,8 +1,8 @@
 /**
  * @component BuildCodeEntry
  * @description 改枪码录入入口：页面顶部主按钮 + 右侧抽屉内的录入器。
- *              本站为纯静态站，录入不产生服务端写入，走抽屉可以让用户在方案列表上直接补录，
- *              不必离开当前页再返回（独立页 /builds/new 仍保留，供直接访问）。
+ *              抽屉里填完口令可直接入库（写入成功后列表自动刷新），用户不必离开当前页；
+ *              独立页 /builds/new 仍保留，供直接访问。
  * @author gouxinjie
  * @created 2026-11-27
  * @updated 2026-11-27
@@ -65,7 +65,7 @@ export default function BuildCodeEntry({
             录入改枪码
           </h2>
           <p className="hidden text-[11px] text-muted sm:block">
-            草稿只保存在本机浏览器，导出后覆盖 constants/build-codes.json
+            填好口令点「直接入库」，方案会立刻出现在列表里
           </p>
         </div>
 

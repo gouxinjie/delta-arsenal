@@ -30,6 +30,8 @@ const BASE_HEADERS = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // better-sqlite3 是原生模块，必须由 Node 直接 require：运行时读写 data/builds.db 时不能被 bundler 打包
+  serverExternalPackages: ['better-sqlite3'],
   // 图片全部为构建期下载到 public/ 的本地文件，无需 Next 图片优化服务
   images: { unoptimized: true },
   // 隐藏 X-Powered-By，减少指纹信息

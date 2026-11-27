@@ -9,14 +9,14 @@
 - **穿甲对照矩阵**：弹种 × 护甲等级速查，三色判定，出装前快速确认带几级弹。
 - **弹药库**：全口径弹药数据，含穿透等级、伤害倍率、适用枪械。
 - **武器图鉴**：收录枪械面板、口径、可改装槽位与官方图。
-- **改枪码**：玩家整理的开火方案（烽火地带 / 全面战场），按改装总价排序，一键复制改枪码；数据真源为 `constants/build-codes.json`（人工维护，不进 SQLite），站内 `/builds/new` 提供录入器，可导出合并后的数据文件。
+- **改枪码**：玩家整理的开火方案（烽火地带 / 全面战场），按改装总价排序，一键复制改枪码；数据存在运行时库 `data/builds.db`，站内录入器填好口令点「直接入库」即刻生效（`constants/build-codes.json` 仅作首次播种的种子与备份）。
 - **搜索索引**：前端全文搜索（`public/search-index.json`）。
 
 ## 技术栈
 
 - Next.js 15（App Router）+ TypeScript + Tailwind CSS
-- SQLite（better-sqlite3），构建期 SSG 直读，运行时零外部依赖
-- 部署：阿里云 ECS（Nginx 反代 :3000 + PM2），页面全静态
+- SQLite（better-sqlite3）：`data/delta.db` 为构建期只读快照，`data/builds.db` 为改枪码运行时库
+- 部署：阿里云 ECS（Nginx 反代 :3000 + PM2），页面以 SSG 为主，`/builds` 走 ISR，必须 `next start`
 
 ## 快速开始
 
@@ -45,6 +45,9 @@ pnpm run typecheck
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `NEXT_PUBLIC_SITE_URL` | 生产必填 | 站点根地址（如 `https://example.com`），用于 canonical / OpenGraph / `sitemap.xml` / `robots.txt` 的绝对 URL；缺省回退 `http://localhost:3000` |
+| `BUILDS_WRITE_TOKEN` | 用到录入器时必填 | 改枪码写入口令（建议 32 位以上随机串）。未配置时 `POST /api/builds` 一律返回 503，录入器只能存本地草稿 |
+
+> 部署要点：`data/` 目录必须对 PM2 进程**可写**（首次启动会自动创建 `data/builds.db` 并从 `constants/build-codes.json` 播种），且该文件不随代码发布覆盖，需要纳入定期备份。
 
 ## 数据链路
 
@@ -66,10 +69,10 @@ pnpm run typecheck
 app/                  Next.js 路由
 components/commons/   公共组件（每组件独立文件夹 + index.tsx）
 hooks/                通用前端行为 Hook（useOverlay：滚动锁定 / Esc / 焦点陷阱）
-constants/            游戏常量与站点常量（含口径图标真源 caliber-icons.json、改枪码真源 build-codes.json）
+constants/            游戏常量与站点常量（含口径图标真源 caliber-icons.json、改枪码种子 build-codes.json）
 lib/                  数据库读取层（db.ts）
 scripts/              sync.mjs 等脚本
-data/                 delta.db（入库，生成物）
+data/                 delta.db（构建期生成物）+ builds.db（改枪码运行时库，不随发布覆盖，需备份）
 public/img/weapons/   构建期下载的武器图
 public/img/ammo/      构建期下载的口径贴图
 public/search-index.json  前端搜索索引（sync 生成）

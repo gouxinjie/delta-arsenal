@@ -11,9 +11,10 @@
 ## 技术栈
 
 - Next.js 15（App Router）+ TypeScript + Tailwind CSS，构建期 SSG 直读 SQLite
-- 数据库：SQLite（better-sqlite3），文件 `data/delta.db`，**入库真源**
+- 数据库：两个独立库——`data/delta.db`（弹药/武器，sync 生成的构建期快照，入库）与 `data/builds.db`（改枪码，运行时人工录入，**不入 git，需备份**）
 - 数据同步：`scripts/sync.mjs`（Node ≥ 22，无框架依赖；better-sqlite3 按 Node 22 ABI 编译）
-- 部署：阿里云 ECS（Nginx 反代 :3000 + PM2），页面全静态
+- 部署：阿里云 ECS（Nginx 反代 :3000 + PM2），页面以 SSG 为主；`/builds` 为 ISR（60s 兜底 + 写入后 `revalidatePath` 即时失效），因此**必须 `next start`，不能纯静态托管**
+- 写入口令：环境变量 `BUILDS_WRITE_TOKEN`，未配置时 `/api/builds` 一律拒绝写入（fail closed）
 
 ## 常用命令
 
@@ -36,7 +37,7 @@ pnpm run lint       # ESLint
 | 弹药全字段（118 条） | `AVA-2568/delta-gun-tierlist@main` 的 `data/game/ammo.json`（经 jsDelivr） | `ammo_item_id` 与枪械表 objectID 直接对应；含 `penetration_matrix`（每级甲穿透判定），矩阵页数据现成 |
 | 枪械面板 + 官方图（47 把） | `jiansenc/DeltaForceData@main` 的 `public/json/gun/gunRifle.json`（经 jsDelivr） | `gunDetail.ammo[].objectID` 用于建立弹药↔武器关联 |
 | 武器补充（68 把） | npm 包 `delta-force-core`（本地，无网络） | 按名称补 DFD 缺失的枪，面板字段略少 |
-| 改枪码（人工维护） | `constants/build-codes.json` | 本站整理 + 公开攻略转载（卡片标注作者与来源）；**不进 SQLite**，`/builds/new` 录入器导出合并 JSON |
+| 改枪码（人工维护） | 运行时库 `data/builds.db`（`lib/builds-db.ts`） | 本站整理 + 公开攻略转载；`/builds` 录入器带口令即可写入并即时生效。`constants/build-codes.json` 仅作**首次播种的种子**与人工备份，删库后会自动重新播种 |
 | 图片 | `playerhub.df.qq.com`（腾讯 CDN） | **构建期下载到 `/public/img/`，禁止热链** |
 
 - `tmp/*_cache.json` 是拉取失败的本地回退缓存；**sync 失败优先检查缓存新鲜度**
@@ -53,7 +54,7 @@ hooks/                通用前端行为 Hook（useOverlay 等）
 constants/            游戏与站点常量（caliber-icons.json 为口径图标真源；weapon-aliases.json 为武器别名真源；weapon-grades.json 为武器 1-4 级社区分级真源，均由 sync 消费）
 lib/                  数据库读取层（db.ts，全部带 JSDoc）
 scripts/              sync.mjs 等脚本
-data/                 delta.db（入库，勿手改；重建走 pnpm run sync）
+data/                 delta.db（sync 生成物，入库，勿手改）+ builds.db（改枪码运行时库，gitignore，需备份）
 public/img/weapons/   构建期下载的武器图
 public/img/ammo/      构建期下载的口径贴图
 public/search-index.json  前端搜索索引（sync 生成）
@@ -63,7 +64,7 @@ UI/                   设计稿参考图
 
 ## 约定与红线
 
-1. **不要手改 `data/delta.db`**——它是生成物，改了会被下次 sync 覆盖
+1. **不要手改 `data/delta.db`**——它是生成物，改了会被下次 sync 覆盖；改枪码数据在 `data/builds.db`（运行时库，sync 不碰），**不要删**：删掉只会按 `constants/build-codes.json` 重新播种，之后线上录入的内容会全部丢失
 2. 主题色 token 以 `app/globals.css` 为唯一事实源（暗色：底 `#0a0f15` / 面板 `#101922` / 强调青绿 `#2fe3a4`；浅色见 `[data-theme="light"]`），写组件时用 CSS 变量，不要散落硬编码
 3. 数字/口径一律等宽字体
 4. 页面必须带数据版本标注（读 `meta` 表）与「非官方」声明

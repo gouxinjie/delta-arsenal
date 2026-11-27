@@ -86,6 +86,21 @@ export interface BuildWeaponOption {
   image: string;
 }
 
+/**
+ * 写入接口响应体
+ * @description 全站接口统一返回结构：success / code / message / data
+ */
+export interface BuildCodeWriteResult {
+  /** 业务是否成功 */
+  success: boolean;
+  /** 业务码：0 成功，其余与 HTTP 语义对齐（400 / 401 / 409 / 413 / 500 / 503） */
+  code: number;
+  /** 给用户看的提示文案 */
+  message: string;
+  /** 成功时返回写入后的记录 id */
+  data?: { id: string };
+}
+
 /** 卡片展示模型（武器与图片已在构建期解析补齐） */
 export interface BuildCodeView {
   /** 唯一标识 */

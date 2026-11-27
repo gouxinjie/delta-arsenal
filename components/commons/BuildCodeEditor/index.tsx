@@ -1,17 +1,19 @@
 /**
  * @component BuildCodeEditor
  * @description 改枪码录入器：粘贴改枪码自动识别武器 / 场景，补齐方案名、价格、方案标签与备注，
- *              生成标准记录 JSON（面板数值统一由武器图鉴承载，录入器不再重复维护）；草稿保存在本机 localStorage，可下载「已收录 + 本地草稿」合并后的
- *              constants/build-codes.json（本站为静态站，没有后端写入能力）
+ *              填好口令后「直接入库」（POST /api/builds 写入 data/builds.db，列表立即刷新）；
+ *              无口令时可存本机 localStorage 草稿，并下载「已入库 + 草稿」合并的 JSON 作备份
+ *              （面板数值统一由武器图鉴承载，录入器不再重复维护）
  * @author gouxinjie
  * @created 2026-11-27
- * @updated 2026-11-27（字号校准 14 / 12–13 / 11，辅助文字对比度、预览复制、下载兼容、下拉控件抽取）
+ * @updated 2026-11-27（新增直接入库；字号校准、对比度与下载兼容修复）
  */
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import SmartImage from '@/components/commons/SmartImage';
 import { IconCopy, IconRifle } from '@/components/commons/icons';
 import {
@@ -29,10 +31,21 @@ import {
   subscribeDrafts,
   writeDrafts,
 } from '@/lib/build-code-drafts';
+import {
+  getTokenServerSnapshot,
+  getTokenSnapshot,
+  subscribeToken,
+  writeToken,
+} from '@/lib/builds-token';
 import { copyText } from '@/lib/clipboard';
 import { formatPriceWan } from '@/lib/format';
 import { normalizeWeaponName, shortWeaponName } from '@/lib/weapon-name';
-import type { BuildCodeRecord, BuildScenario, BuildWeaponOption } from '@/types/build-code';
+import type {
+  BuildCodeRecord,
+  BuildCodeWriteResult,
+  BuildScenario,
+  BuildWeaponOption,
+} from '@/types/build-code';
 import SelectField from './SelectField';
 
 /** 改枪码尾段格式：游戏生成的编码为 12–32 位字母数字 */
@@ -202,6 +215,10 @@ export default function BuildCodeEditor({
   const [featured, setFeatured] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  /** 是否正在提交入库请求（提交期间禁用按钮，避免重复写入） */
+  const [submitting, setSubmitting] = useState(false);
+
+  const router = useRouter();
   /** 最近一次复制成功的目标（记录 id 或 'merged'），用于按钮文字反馈 */
   const [copiedKey, setCopiedKey] = useState('');
   /** 「已复制」提示的定时器：抽屉随时会被关闭，卸载时必须清掉，避免组件消失后仍在计时 */
@@ -212,6 +229,12 @@ export default function BuildCodeEditor({
     subscribeDrafts,
     getDraftsSnapshot,
     getDraftsServerSnapshot
+  );
+  // 入库口令同样走外部存储订阅：水合前是空串，挂载后自动取回本机记住的口令
+  const token = useSyncExternalStore(
+    subscribeToken,
+    getTokenSnapshot,
+    getTokenServerSnapshot
   );
 
   const parsed = useMemo(() => parseBuildCode(code, weapons), [code, weapons]);
@@ -316,27 +339,48 @@ export default function BuildCodeEditor({
 
   const previewRecord = useMemo(() => composeRecord(), [composeRecord]);
 
-  /** 保存草稿：同 id 时自动追加序号，避免本地草稿互相覆盖 */
-  const handleSave = () => {
-    setNotice('');
+  /** 复位表单：保留录入日期与已选枪械，方便同一天、同一把枪连续录入多套方案 */
+  const resetForm = () => {
+    setCode('');
+    setTitle('');
+    setPrice('');
+    setNote('');
+    setTags([]);
+    setTagInput('');
+    setFeatured(false);
+  };
+
+  /**
+   * 提交前校验
+   * @returns 通过时返回待提交记录；不通过返回 null，并已写好错误提示
+   * @description 存草稿与直接入库共用，避免两处校验口径不一致
+   */
+  const checkBeforeSubmit = (): BuildCodeRecord | null => {
     if (!code.trim()) {
       setError('请先粘贴游戏内复制的改枪码');
-      return;
+      return null;
     }
     if (!parsed.validSuffix) {
       setError('编码格式不正确：尾段应为 12–32 位字母数字，请确认复制完整（含结尾字符）');
-      return;
+      return null;
     }
     if (!selectedWeapon) {
       setError('请选择对应的枪械');
-      return;
+      return null;
     }
     // previewRecord 由同一 composeRecord 派生，直接复用，避免提交时再组装一次
-    const record = previewRecord;
-    if (!record) {
+    if (!previewRecord) {
       setError('记录不完整，请检查枪械与改枪码');
-      return;
+      return null;
     }
+    return previewRecord;
+  };
+
+  /** 保存草稿：同 id 时自动追加序号，避免本地草稿互相覆盖 */
+  const handleSave = () => {
+    setNotice('');
+    const record = checkBeforeSubmit();
+    if (!record) return;
 
     const usedIds = new Set([...existing, ...drafts].map((item) => item.id));
     let id = record.id;
@@ -349,16 +393,51 @@ export default function BuildCodeEditor({
     const next = [...drafts, { ...record, id }];
     writeDrafts(next);
     setError('');
-    setNotice(`已存入本地草稿：${record.title ?? shortWeaponName(selectedWeapon.name)}（共 ${next.length} 条）`);
+    setNotice(`已存入本地草稿：${record.title ?? shortWeaponName(record.weapon)}（共 ${next.length} 条）`);
+    resetForm();
+  };
 
-    // 保留录入日期，方便同一天连续录入多条方案
-    setCode('');
-    setTitle('');
-    setPrice('');
-    setNote('');
-    setTags([]);
-    setTagInput('');
-    setFeatured(false);
+  /**
+   * 直接入库：把当前记录写入站点数据库（data/builds.db）
+   * @description 成功后服务端已 revalidatePath('/builds')，这里再 router.refresh() 让当前页面数据同步；
+   *              用命令式 fetch 而不是 Server Action，是为了把 401 / 409 等文案直接回显到表单
+   */
+  const handleSubmit = async () => {
+    setNotice('');
+    const record = checkBeforeSubmit();
+    if (!record) return;
+    if (!token.trim()) {
+      setError('请先填写入库口令（服务端环境变量 BUILDS_WRITE_TOKEN）');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch('/api/builds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token.trim()}`,
+        },
+        body: JSON.stringify(record),
+      });
+      const result = (await response.json()) as BuildCodeWriteResult;
+
+      if (!result.success) {
+        setError(result.message || '入库失败，请稍后重试');
+        return;
+      }
+
+      setError('');
+      setNotice(`已入库：${record.title ?? shortWeaponName(record.weapon)}，列表已刷新`);
+      resetForm();
+      router.refresh();
+    } catch (error) {
+      console.warn('[build-code-editor] 入库请求失败', error);
+      setError('入库失败：网络异常或服务未启动，请稍后重试');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   /** 清空表单（连标签与提示一起复位） */
@@ -588,6 +667,26 @@ export default function BuildCodeEditor({
               标记为站内推荐（卡片标题前显示 ★）
             </label>
 
+            {/* 入库口令：只做一次校验并记在本机；服务端未配置环境变量时接口会直接拒绝写入 */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <label className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-muted">
+                <span className="shrink-0">入库口令</span>
+                <input
+                  type="password"
+                  value={token}
+                  onChange={(event) => {
+                    writeToken(event.target.value);
+                    setError('');
+                  }}
+                  placeholder="服务端 BUILDS_WRITE_TOKEN"
+                  autoComplete="off"
+                  aria-label="入库口令"
+                  className={`${INPUT_CLASS} num max-w-[280px]`}
+                />
+              </label>
+              <span className="text-[11px] text-muted/85">仅用于入库校验，会记在本机浏览器</span>
+            </div>
+
             {error && <p className="text-[12px] text-danger">{error}</p>}
             {notice && <p className="text-[12px] text-t2">{notice}</p>}
 
@@ -599,10 +698,18 @@ export default function BuildCodeEditor({
             >
               <button
                 type="button"
-                onClick={handleSave}
-                className="rounded bg-accent px-4 py-2 text-[13px] font-semibold text-[color:var(--on-accent)] transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="rounded bg-accent px-4 py-2 text-[13px] font-semibold text-[color:var(--on-accent)] transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                保存为本地草稿
+                {submitting ? '入库中…' : '直接入库'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="rounded border border-edge px-3.5 py-2 text-[13px] text-muted transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/60"
+              >
+                存为本地草稿
               </button>
               <button
                 type="button"
@@ -716,12 +823,12 @@ export default function BuildCodeEditor({
               导出到数据文件
             </h2>
             <p className="mt-2 text-[12px] leading-relaxed text-muted">
-              本站是静态站点，没有后端写入能力：草稿只存在当前浏览器。下载合并后的
+              入库数据存在运行时数据库
               <code className="num mx-1 rounded border border-edge bg-panel-hi px-1.5 py-0.5 text-[12px] text-main">
-                build-codes.json
+                data/builds.db
               </code>
-              覆盖仓库里的 <code className="num text-[12px] text-main">constants/build-codes.json</code>，
-              再重新构建即可全量上线。
+              （<code className="num text-[12px] text-main">constants/build-codes.json</code>
+              仅作首次播种的种子）。下面导出的 JSON 是「已入库 + 本地草稿」的合并快照，用于备份或迁移。
             </p>
             <button
               type="button"
@@ -731,7 +838,7 @@ export default function BuildCodeEditor({
               下载合并后的 JSON（已收录 {existing.length} + 草稿 {drafts.length}）
             </button>
             <p className="mt-2 text-[12px] leading-relaxed text-muted/85">
-              注意：下载文件会覆盖原有 updatedAt 为今天，请先确认草稿内容无误。
+              注意：导出文件的 updatedAt 取今天，仅作备份，不会自动回写数据库。
             </p>
           </section>
         </aside>
