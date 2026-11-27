@@ -10,11 +10,13 @@ import type { AmmoRow, PenetrationMatrix } from '@/types/ammo';
 export const metadata = { title: '穿甲对照矩阵' };
 
 // 图例中的穿透判定四档（与 lib/penetration 的 judge() 阈值保持一致，改规则时两处同步）
+// 四档只对应三种颜色：100% 绿、75%/50% 同金色（judge() 的 warn 档不区分级差）、0% 红，
+// 故「等级相同」必须用 --t5 而非 --warn，否则图例颜色与单元格对不上
 // bar 为卡片左侧色条颜色，取主题变量而非 Tailwind 类名，保证浅色主题同步降饱和
 const PEN_RULES: { label: string; rate: string; icon: ReactNode; tone: string; bar: string }[] = [
   { label: '高 2 级以上', rate: '100%', icon: <IconCheck className="h-3.5 w-3.5" />, tone: 'text-t2', bar: 'var(--t2)' },
   { label: '高 1 级', rate: '75%', icon: <IconWarn className="h-3.5 w-3.5" />, tone: 'text-t5', bar: 'var(--t5)' },
-  { label: '等级相同', rate: '50%', icon: <IconWarn className="h-3.5 w-3.5" />, tone: 'text-warn', bar: 'var(--warn)' },
+  { label: '等级相同', rate: '50%', icon: <IconWarn className="h-3.5 w-3.5" />, tone: 'text-t5', bar: 'var(--t5)' },
   { label: '低于甲级', rate: '0%', icon: <IconCross className="h-3.5 w-3.5" />, tone: 'text-danger', bar: 'var(--danger)' },
 ];
 
@@ -39,6 +41,7 @@ function AmmoLabel({ ammo, color, special }: AmmoLabelProps) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-1.5">
+        {/* 名称保持常规字重，层级交给下方 13px 口径行与 11px 徽章的对比来承担 */}
         <span className="font-medium">{ammo.name}</span>
         <span
           className="badge shrink-0"
@@ -58,14 +61,17 @@ function AmmoLabel({ ammo, color, special }: AmmoLabelProps) {
           <span
             className="badge shrink-0"
             style={{ color: 'var(--warn)', borderColor: 'var(--warn)', opacity: 0.9 }}
-            title="穿透衰减不遵循常规四档（箭矢/龙息/双头弹/特效弹等），以单元格实测值为准"
+            title="穿透衰减偏离常规四档：箭矢 / 龙息 / 双头弹 / 独头弹 / 45-70 等特殊弹种，或 7 级弹无视护甲（对任意甲级 100%）；以单元格实测值为准"
           >
             特殊
           </span>
         )}
       </div>
-      <p className="num text-xs text-muted mt-1 ml-0.5">
-        {ammo.caliber} · {ammo.rarity ?? '—'}
+      {/* 口径（.338 Lap Mag 这类）是区分同名弹（AP / m61 / SNB）的唯一依据，
+          提到 13px 半粗 + 接近正文色；品阶仍留 11px muted 作第三层，不再和口径同权 */}
+      <p className="num mt-1 ml-0.5 flex flex-wrap items-baseline gap-x-1.5 leading-tight">
+        <span className="text-[13px] font-medium text-main/90">{ammo.caliber}</span>
+        <span className="text-[11px] text-muted">· {ammo.rarity ?? '—'}</span>
       </p>
     </>
   );
@@ -122,8 +128,9 @@ export default function MatrixPage() {
           aria-hidden="true"
         />
 
-        {/* 术语说明：图标统一装进 18px 方形容器，保证三条文案左缘严格对齐、换行不参差 */}
-        <div className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2 xl:grid-cols-3">
+        {/* 术语说明：图标统一装进 18px 方形容器，保证三条文案左缘严格对齐、换行不参差
+            用 flex-wrap 按内容宽度排布而非 grid 等分列，避免宽屏下三列被拉满导致文字间隔过大 */}
+        <div className="flex flex-wrap gap-x-8 gap-y-2.5">
           <div className="flex gap-2.5">
             <span
               className="mt-[2px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border border-accent/25 bg-accent/10 text-accent"
@@ -132,7 +139,7 @@ export default function MatrixPage() {
               <IconAmmo className="h-3 w-3" />
             </span>
             <span>
-              <b className="text-main font-semibold">穿N</b>：穿透等级（0–7），俗称「N 级弹」
+              <b className="text-main font-semibold">穿N</b>：穿透等级 0–7，即「N 级弹」
             </span>
           </div>
           <div className="flex gap-2.5">
@@ -143,7 +150,7 @@ export default function MatrixPage() {
               <span className="h-2 w-2 rounded-sm bg-t4" />
             </span>
             <span>
-              <b className="text-main font-semibold">品阶徽章</b>：白→绿→蓝→紫→金弹，与游戏内颜色一致
+              <b className="text-main font-semibold">品阶</b>：白→绿→蓝→紫→金，与游戏内同色
             </span>
           </div>
           <div className="flex gap-2.5">
@@ -154,7 +161,7 @@ export default function MatrixPage() {
               <span className="h-2 w-2 rounded-sm bg-danger" />
             </span>
             <span>
-              <b className="text-danger font-semibold">穿6/穿7</b>：狙击枪/重机枪专属弹（红标），不占常规品阶
+              <b className="text-danger font-semibold">红标</b>：穿6/穿7 专属弹，多见于大威力步枪 / 机枪 / 狙击枪
             </span>
           </div>
         </div>
@@ -190,8 +197,10 @@ export default function MatrixPage() {
             ))}
           </div>
           <p className="mt-2 text-[12px] leading-[1.65] text-muted/70">
-            数值为肉体伤害保留比例；打不穿时仅消耗护甲耐久。箭矢、龙息、双头弹及特效弹等特殊弹种不适用该表，
-            标记「特殊」的行以单元格实测值为准。
+            打不穿时单发 0 肉伤，只磨甲耐久；甲碎后伤害恢复全额。表格只列 1–6 级甲。
+            <br />
+            <b className="font-medium text-warn">特殊</b>
+            行以单元格实测为准：非标准衰减弹（箭矢 / 龙息 / 双头弹 / 独头弹 / 45-70 等），以及 7 级弹（无视护甲，任意甲级 100%）。
           </p>
         </div>
 
@@ -200,7 +209,7 @@ export default function MatrixPage() {
           <span className="w-[3px] shrink-0 self-stretch rounded-full bg-accent" aria-hidden="true" />
           <p className="text-main">
             <b className="mr-1.5 font-semibold text-accent">结论</b>
-            常规弹想打得动，弹级必须 ≥ 甲级；同级开始掉血，但伤害只有一半。
+            弹级 ≥ 甲级才打得动：同级 50%、高 1 级 75%、高 2 级 100%；低于甲级没有肉伤，只能磨甲等它碎。
           </p>
         </div>
       </section>
@@ -214,12 +223,14 @@ export default function MatrixPage() {
         <table className="matrix-table block w-full text-sm md:table md:min-w-[780px]">
           <thead className="hidden md:table-header-group">
             <tr className="bg-panel">
-              <th className="sticky left-0 bg-panel z-10 px-3 py-3 text-left min-w-[220px] text-[13px] tracking-wider text-muted">
+              {/* 表头下边框 + 12px 字号：6 列表头横向空间紧，压缩字号后列与列之间不挤 */}
+              <th className="sticky left-0 bg-panel z-10 min-w-[220px] border-b border-edge px-3 py-2.5 text-left text-[12px] tracking-wider text-muted">
                 <span className="text-accent font-semibold">你的子弹</span>（按穿透等级排序）
               </th>
               {ARMOR_LEVELS.map((lv) => (
-                <th key={lv} className="px-3 py-3">
-                  <span className="num text-accent inline-flex items-center gap-1.5 text-[13px] whitespace-nowrap">
+                // text-center 必须显式加：th 默认继承左对齐，会让表头文字与居中的单元格数值错位
+                <th key={lv} className="border-b border-edge px-2 py-2.5 text-center">
+                  <span className="num text-accent inline-flex items-center gap-1 text-[12px] font-medium whitespace-nowrap">
                     <IconShield className="w-3.5 h-3.5" />
                     敌人{lv}级甲
                   </span>
@@ -231,11 +242,12 @@ export default function MatrixPage() {
             {rows.map((a) => (
               <tr
                 key={a.id}
-                className="group mb-2.5 grid grid-cols-3 gap-1.5 rounded-lg border border-edge/70 bg-panel/40 p-2.5 transition-colors last:mb-0 hover:border-accent/50 hover:bg-panel-hi/60 md:mb-0 md:table-row md:gap-0 md:rounded-none md:border-0 md:bg-transparent md:p-0 md:hover:bg-accent/[0.06]"
+                className="group mb-2.5 grid grid-cols-3 gap-1.5 rounded-lg border border-edge/70 bg-panel/40 p-2.5 transition-colors last:mb-0 hover:border-accent/50 hover:bg-panel-hi/60 md:mb-0 md:table-row md:gap-0 md:rounded-none md:border-0 md:bg-transparent md:p-0 md:hover:bg-panel-hi"
               >
-                {/* 桌面端首列是 sticky 不透明底（遮住横向滚动内容），hover 只能改自身底色：bg → panel-hi 有明显亮度差 */}
+                {/* 桌面端首列是 sticky 不透明底（遮住横向滚动内容），hover 只能改自身底色：
+                    行 hover 与首列 hover 都用 panel-hi，整行高亮才不会在首列断开 */}
                 <td
-                  className="col-span-3 transition-colors md:col-span-1 md:table-cell md:sticky md:left-0 md:z-10 md:bg-bg md:px-3 md:py-2.5 md:group-hover:bg-panel-hi"
+                  className="col-span-3 transition-colors md:col-span-1 md:table-cell md:sticky md:left-0 md:z-10 md:min-w-[220px] md:bg-bg md:px-3 md:py-3 md:group-hover:bg-panel-hi"
                   style={{ boxShadow: `inset 3px 0 0 ${a.color}` }}
                 >
                   <AmmoLabel ammo={a} color={a.color} special={a.special} />
@@ -245,16 +257,21 @@ export default function MatrixPage() {
                   return (
                     <td
                       key={lv}
-                      className="num rounded border border-edge/60 px-1.5 py-1.5 text-center md:rounded-none md:border-0 md:px-2 md:py-2"
+                      className="num rounded border border-edge/60 px-1.5 py-2 text-center md:rounded-none md:border-0 md:px-2 md:py-3 md:align-middle"
                       style={{ background: j.bg, color: j.fg }}
                       title={cellTitle(j)}
                       aria-label={`${lv} 级甲：${cellTitle(j)}`}
                     >
                       {/* 窄屏没有表头，护甲等级标签落在单元格内；桌面由 thead 承载，故隐藏 */}
-                      <p className="text-[10px] text-muted opacity-80 md:hidden">{lv}级甲</p>
-                      <p className="mt-1 text-[13px] font-semibold md:mt-0">
-                        <span aria-hidden="true">{j.glyph}</span>
-                        <span className="ml-0.5 text-[10px] opacity-70">{j.rate === null ? '—' : `${j.rate}%`}</span>
+                      <p className="text-[10px] leading-none text-muted opacity-80 md:hidden">{lv}级甲</p>
+                      {/* 保留比例是这张表的核心信息，故数值 13px 加粗为主、✓/!/✕ 字形 11px 弱化只作快速扫读 */}
+                      <p className="mt-1.5 flex items-center justify-center gap-1 leading-none md:mt-0">
+                        <span aria-hidden="true" className="text-[11px] opacity-70">
+                          {j.glyph}
+                        </span>
+                        <span className="text-[13px] font-semibold">
+                          {j.rate === null ? '—' : `${j.rate}%`}
+                        </span>
                       </p>
                     </td>
                   );

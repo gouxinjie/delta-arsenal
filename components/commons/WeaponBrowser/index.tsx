@@ -88,7 +88,7 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
             <button
               key={t.label}
               onClick={() => setTab(t.label)}
-              className={`flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs px-2.5 sm:px-3.5 py-1.5 rounded-full border transition-colors ${
+              className={`flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs px-2.5 sm:px-3.5 py-1.5 rounded-full border transition-colors ${
                 active
                   ? 'bg-accent text-[color:var(--on-accent)] border-accent font-semibold [box-shadow:var(--tab-glow)]'
                   : 'border-edge bg-panel/60 text-muted hover:bg-accent hover:text-[color:var(--on-accent)] hover:border-accent hover:font-semibold hover:[box-shadow:var(--tab-glow)]'

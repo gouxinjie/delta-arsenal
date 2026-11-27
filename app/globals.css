@@ -460,11 +460,15 @@ table.matrix-table th {
   border-color: var(--border);
 }
 
-/* 矩阵表在 ≥768px 恢复表格布局后，用单元格上边框画行分隔线：
-   table 默认 border-collapse: separate 时浏览器不绘制 <tr> 的边框，只能落到 td 上 */
+/* 矩阵表在 ≥768px 恢复表格布局后，用单元格边框画网格：
+   table 默认 border-collapse: separate 时浏览器不绘制 <tr> 的边框，只能落到 td 上。
+   列线从第二列开始画，避开首列 sticky（sticky 单元格的边框会随内容横向滚动留下残线） */
 @media (min-width: 768px) {
   table.matrix-table tbody tr + tr td {
     border-top: 1px solid var(--border);
+  }
+  table.matrix-table tbody td + td {
+    border-left: 1px solid var(--border);
   }
 }
 
