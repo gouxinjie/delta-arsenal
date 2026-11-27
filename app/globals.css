@@ -247,6 +247,12 @@ body::before {
   .sk {
     animation: none;
   }
+  /* 关掉扫动后 ::after 会停在 translateX(-100%) 而不可见，改为常亮的整条细线，保留「加载中」信号 */
+  .route-bar::after {
+    transform: none;
+    width: 100%;
+    opacity: 0.55;
+  }
 }
 
 @keyframes fadeIn {

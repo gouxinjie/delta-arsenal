@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Header from '@/components/commons/Header';
 import Footer from '@/components/commons/Footer';
+import RouteProgress from '@/components/commons/RouteProgress';
 import { getSiteMeta } from '@/lib/site-meta';
 import { SITE_URL, THEME_STORAGE_KEY } from '@/constants/site';
 
@@ -54,6 +55,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-screen flex flex-col bg-bg text-main">
+        {/* 全局跳转进度条：点击瞬间出现，补足 RSC 返回前的空窗 */}
+        <RouteProgress />
         <Header />
         <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 py-4">{children}</main>
         <Footer siteMeta={siteMeta} />
