@@ -1,9 +1,10 @@
 /**
  * @component WeaponBrowser
- * @description 武器图鉴浏览器：按类型 Tab（带图标 + 计数）筛选，卡片网格展示，点击卡片从右侧弹出详情抽屉（不跳页）
+ * @description 武器图鉴浏览器：按类型 Tab（带图标 + 计数）筛选 + 名称关键词搜索（不区分大小写），卡片网格展示，
+ *              点击卡片从右侧弹出详情抽屉（不跳页）
  * @author gouxinjie
  * @created 2026-11-23
- * @updated 2026-11-26
+ * @updated 2026-11-27
  */
 'use client';
 
@@ -19,6 +20,7 @@ import {
   IconShotgun,
   IconPistol,
   IconSpecial,
+  IconSearch,
   IconUnknown,
 } from '@/components/commons/icons';
 import SmartImage from '@/components/commons/SmartImage';
@@ -67,13 +69,24 @@ interface WeaponBrowserProps {
 
 export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
   const [tab, setTab] = useState('全部');
+  /** 武器名称搜索关键词（受控输入，前后空格在过滤时忽略） */
+  const [keyword, setKeyword] = useState('');
   /** 当前抽屉中展示的武器，null 表示抽屉关闭 */
   const [selected, setSelected] = useState<WeaponDetail | null>(null);
   const closeDrawer = useCallback(() => setSelected(null), []);
 
+  /** 归一化后的关键词：小写化实现英文名称不区分大小写 */
+  const normalizedKeyword = keyword.trim().toLowerCase();
+
+  /** 待展示列表：先按分类 Tab 过滤，再按名称关键词包含匹配（两者同时生效） */
   const list = useMemo(
-    () => (tab === '全部' ? weapons : weapons.filter((w) => w.category === tab)),
-    [weapons, tab]
+    () =>
+      weapons.filter((w) => {
+        if (tab !== '全部' && w.category !== tab) return false;
+        if (!normalizedKeyword) return true;
+        return w.name.toLowerCase().includes(normalizedKeyword);
+      }),
+    [weapons, tab, normalizedKeyword]
   );
 
   /** 抽屉进度条用到的字段在全库中的最大值（刻度算法与武器详情页共用 lib/view） */
@@ -92,6 +105,31 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
 
   return (
     <div>
+      {/* 名称搜索：放大镜图标 + 受控输入；英文名称比较前统一小写，实现不区分大小写 */}
+      <div className="relative mb-3 sm:mb-4">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+          <IconSearch className="w-4 h-4" />
+        </span>
+        <input
+          type="text"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          placeholder="搜索武器名称，如 M4A1 / AK"
+          aria-label="按武器名称搜索"
+          className="w-full rounded-lg border border-edge bg-panel/60 py-2 pl-9 pr-16 text-sm text-main outline-none transition-colors placeholder:text-muted/60 focus:border-accent focus:bg-panel"
+        />
+        {keyword && (
+          <button
+            type="button"
+            onClick={() => setKeyword('')}
+            aria-label="清除搜索关键词"
+            className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:text-accent"
+          >
+            清除
+          </button>
+        )}
+      </div>
+
       {/* 分类 Tab：胶囊按钮，选中青绿填充（窄屏缩小内边距与字号，尽量少占高度） */}
       <div className="flex gap-1.5 flex-wrap mb-4 sm:mb-5">
         {TABS.map((t) => {
@@ -116,6 +154,13 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
           );
         })}
       </div>
+
+      {/* 命中提示：仅有关键词且命中结果非空时展示，避免与下方空状态重复 */}
+      {normalizedKeyword && list.length > 0 && (
+        <p className="mb-2 text-[11px] text-muted">
+          命中 <b className="num text-accent">{list.length}</b> 把武器
+        </p>
+      )}
 
       {/* 武器卡片网格 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-x-3 sm:gap-y-4 lg:grid-cols-3">
@@ -182,7 +227,12 @@ export default function WeaponBrowser({ weapons }: WeaponBrowserProps) {
           );
         })}
       </div>
-      {!list.length && <p className="text-muted text-sm py-10 text-center">该分类暂无收录</p>}
+      {/* 空状态：有关键词时提示搜索无结果（区分「分类无收录」） */}
+      {!list.length && (
+        <p className="text-muted text-sm py-10 text-center">
+          {normalizedKeyword ? `没有找到名称包含「${keyword.trim()}」的武器` : '该分类暂无收录'}
+        </p>
+      )}
 
       {/* 详情抽屉：左侧滑出，展示弹药 / 属性 / 槽位 */}
       <WeaponDrawer weapon={selected} statMax={statMax} onClose={closeDrawer} />
