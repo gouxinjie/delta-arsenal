@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 站点图标：与 components/commons/Header 页头 Logo 同源（青绿渐变三角 + 中心挖空），无底板 -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8affd4" />
+      <stop offset="100%" stop-color="#14b87e" />
+    </linearGradient>
+  </defs>
+  <!-- evenodd 让第二段子路径成为真正的透明挖空（favicon 拿不到 CSS 变量，也无法填页面底色） -->
+  <path
+    d="M16 3 L30 28 H2 Z M16 12 L23.5 25 H8.5 Z"
+    fill="url(#g)"
+    fill-rule="evenodd"
+  />
+</svg>

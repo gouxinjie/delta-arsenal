@@ -38,6 +38,11 @@ export const metadata: Metadata = {
     title: '三角洲军械库 — 三角洲行动弹药与武器数据速查',
     description: '全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵。',
   },
+  // 站点图标走 public 固定路径而非 app/icon.svg 文件约定：
+  // 文件约定生成的 URL 由内容 hash 决定，浏览器 favicon 缓存不遵守 HTTP 缓存头，换 URL 才能可靠失效
+  icons: {
+    icon: [{ url: '/brand-icon.svg', type: 'image/svg+xml' }],
+  },
 };
 
 /**
