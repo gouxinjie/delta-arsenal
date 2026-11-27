@@ -245,9 +245,11 @@ export default function MatrixPage() {
                 className="group mb-2.5 grid grid-cols-3 gap-1.5 rounded-lg border border-edge/70 bg-panel/40 p-2.5 transition-colors last:mb-0 hover:border-accent/50 hover:bg-panel-hi/60 md:mb-0 md:table-row md:gap-0 md:rounded-none md:border-0 md:bg-transparent md:p-0 md:hover:bg-panel-hi"
               >
                 {/* 桌面端首列是 sticky 不透明底（遮住横向滚动内容），hover 只能改自身底色：
-                    行 hover 与首列 hover 都用 panel-hi，整行高亮才不会在首列断开 */}
+                    行 hover 与首列 hover 都用 panel-hi，整行高亮才不会在首列断开。
+                    窄屏（卡片布局）必须自带 pl-2.5：左侧 3px 品阶色条是 inset 阴影，画在 padding box 左缘，
+                    而 td 在移动端原本无内边距，正文会直接压到色条上（弹名首字母被吃掉）；桌面由 md:px-3 承担 */}
                 <td
-                  className="col-span-3 transition-colors md:col-span-1 md:table-cell md:sticky md:left-0 md:z-10 md:min-w-[220px] md:bg-bg md:px-3 md:py-3 md:group-hover:bg-panel-hi"
+                  className="col-span-3 pl-2.5 transition-colors md:col-span-1 md:table-cell md:sticky md:left-0 md:z-10 md:min-w-[220px] md:bg-bg md:px-3 md:py-3 md:group-hover:bg-panel-hi"
                   style={{ boxShadow: `inset 3px 0 0 ${a.color}` }}
                 >
                   <AmmoLabel ammo={a} color={a.color} special={a.special} />
