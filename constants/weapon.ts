@@ -65,3 +65,20 @@ export const WEAPON_VALUE_ROW_KEYS: readonly (WeaponNumericKey | 'fireModes')[] 
   'muzzleVelocity',
   'soundRadius',
 ];
+
+/**
+ * 武器类别展示顺序
+ * @description 图鉴分类 Tab 与「全部」列表排序共用这一份顺序：此前 Tab 是手写数组、
+ *              列表用 SQL 的二进制排序，两者顺序不一致（列表按 冲锋枪→手枪→步枪 排）。
+ *              新增类别只改这里；未登记的类别在列表末尾兜底。
+ */
+export const WEAPON_CATEGORY_ORDER: readonly string[] = [
+  '步枪',
+  '冲锋枪',
+  '精确射手步枪',
+  '狙击步枪',
+  '轻机枪',
+  '霰弹枪',
+  '手枪',
+  '特殊武器',
+];

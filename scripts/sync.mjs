@@ -32,6 +32,31 @@ const WEAPON_ALIASES = JSON.parse(
   fs.readFileSync(path.join(ROOT, 'constants', 'weapon-aliases.json'), 'utf-8')
 );
 
+// 改装槽位编号 -> 中文名真源（constants/slot-names.json），前端与 sync 共用一份。
+// 补充源（dfc / tierlist）只给得出 socket 编号，因此按本表裁剪：字典里没有的编号不落库，
+// 否则页面会渲染成「槽位 73」这类占位文本（DFD 主源保留原始编号，由前端兜底，避免丢数据）。
+const SLOT_NAMES = JSON.parse(
+  fs.readFileSync(path.join(ROOT, 'constants', 'slot-names.json'), 'utf-8')
+);
+
+/**
+ * 槽位编号列表去重并归一为字符串
+ * @param {Array<{socket_id?: number, slotID?: string}>} sockets - DFD accessory 或 tierlist sockets
+ * @param {boolean} knownOnly - 是否只保留 SLOT_NAMES 已登记的编号（补充源用 true）
+ * @returns {string[]} 去重后的槽位编号数组，按编号升序；已知项不足一半时返回空数组
+ */
+function normalizeSlots(sockets, knownOnly) {
+  const unique = [...new Set(
+    (sockets ?? []).map((s) => String(s.socket_id ?? s.slotID ?? '')).filter(Boolean)
+  )];
+  if (!knownOnly) return unique.sort((a, b) => Number(a) - Number(b));
+  const known = unique.filter((id) => SLOT_NAMES[id]);
+  // 已知项不足一半，说明该武器走的是另一套配件体系（如复合弓的弓专用件编号与枪械撞号），
+  // 落库只会得到错标的槽位，整把跳过、由前端显示「暂无槽位数据」
+  if (known.length * 2 < unique.length) return [];
+  return known.sort((a, b) => Number(a) - Number(b));
+}
+
 const SOURCES = {
   guns: 'https://cdn.jsdelivr.net/gh/jiansenc/DeltaForceData@main/public/json/gun/gunRifle.json',
   ammo: 'https://cdn.jsdelivr.net/gh/AVA-2568/delta-gun-tierlist@main/data/game/ammo.json',
@@ -271,7 +296,8 @@ async function main() {
       // 候选图 URL 列表（下载时按顺序尝试，成功即止）
       imageUrls: [g.pic ?? ''].filter(Boolean),
       panel,
-      slots: (gd.accessory ?? []).map((s) => s.slotID).filter(Boolean),
+      // 主源槽位保留原始编号（含字典未登记项，前端回退为「槽位 N」），仅去重
+      slots: normalizeSlots(gd.accessory, false),
       source: 'dfd',
     });
     seenNames.add(g.objectName);
@@ -318,7 +344,8 @@ async function main() {
         muzzleVelocity: w.muzzleVelocity, magSize: w.magazineCapacity,
         fireModes: w.fireModes ?? [], soundRadius: w.soundRadius,
       },
-      slots: [],
+      // dfc 本身无槽位字段，改用 tierlist 的 sockets（同一套 slotID，仅保留字典已登记项）
+      slots: normalizeSlots(tierWeapon?.sockets, true),
       source: 'dfc',
     });
     seenNames.add(w.name);
@@ -362,7 +389,8 @@ async function main() {
         muzzleVelocity: w.muzzle_velocity_mps, magSize: w.clip_capacity,
         fireModes: w.fire_modes ?? [], soundRadius: w.acoustics?.shot_distance_m,
       },
-      slots: [],
+      // 同 dfc：用本记录的 sockets 补槽位，未登记编号不入库
+      slots: normalizeSlots(w.sockets, true),
       source: 'tierlist',
     });
     seenIds.add(id);

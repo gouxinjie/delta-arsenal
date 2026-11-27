@@ -12,7 +12,7 @@ import AmmoTile from '@/components/commons/AmmoTile';
 import Drawer from '@/components/commons/Drawer';
 import SectionTitle from '@/components/commons/SectionTitle';
 import SmartImage from '@/components/commons/SmartImage';
-import { SLOT_NAMES } from '@/constants/game';
+import { toSlotChips } from '@/lib/view';
 import {
   WEAPON_BAR_STAT_KEYS,
   WEAPON_STAT_META,
@@ -175,12 +175,14 @@ export default function WeaponDrawer({ weapon, statMax, onClose }: WeaponDrawerP
               <SectionTitle title="可改装槽位" count={weapon.slots.length} />
               {weapon.slots.length ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {weapon.slots.map((s) => (
+                  {/* 同名槽位（如护木上的多个导轨挂点）合并成「导轨 ×6」，避免一屏重复标签 */}
+                  {toSlotChips(weapon.slots).map((chip) => (
                     <span
-                      key={s}
+                      key={chip.key}
                       className="num text-[11px] border border-edge rounded px-2 py-1 bg-bg/40 text-muted hover:border-accent/60 hover:text-main hover:bg-panel-hi transition-colors"
                     >
-                      {SLOT_NAMES[s] ?? `槽位 ${s}`}
+                      {chip.label}
+                      {chip.count > 1 ? ` ×${chip.count}` : ''}
                     </span>
                   ))}
                 </div>

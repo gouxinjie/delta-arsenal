@@ -18,27 +18,41 @@ import {
   IconLmg,
   IconShotgun,
   IconPistol,
+  IconSpecial,
   IconUnknown,
 } from '@/components/commons/icons';
 import SmartImage from '@/components/commons/SmartImage';
 import WeaponDrawer from '@/components/commons/WeaponDrawer';
-import { WEAPON_CARD_STAT_KEYS, WEAPON_STAT_META } from '@/constants/weapon';
+import { WEAPON_CARD_STAT_KEYS, WEAPON_CATEGORY_ORDER, WEAPON_STAT_META } from '@/constants/weapon';
 import { computeStatMax } from '@/lib/view';
 import type { WeaponDetail } from '@/types/weapon';
 
 /** 图片偏小的分类：短枪身高宽比接近方形，在宽幅图区里会被撑满高度显得过大，单独缩放 */
 const COMPACT_IMG_CATEGORIES = new Set(['手枪']);
 
-/** 分类 Tab 配置：标签 + 图标（图标按当前色继承） */
+/** 类别 -> Tab 图标（类别顺序由 WEAPON_CATEGORY_ORDER 统一维护，此处只负责配图标） */
+const CATEGORY_ICONS: Record<string, (cls: string) => React.ReactNode> = {
+  步枪: (c) => <IconRifle className={c} />,
+  冲锋枪: (c) => <IconSmg className={c} />,
+  精确射手步枪: (c) => <IconDmr className={c} />,
+  狙击步枪: (c) => <IconSniper className={c} />,
+  轻机枪: (c) => <IconLmg className={c} />,
+  霰弹枪: (c) => <IconShotgun className={c} />,
+  手枪: (c) => <IconPistol className={c} />,
+  特殊武器: (c) => <IconSpecial className={c} />,
+};
+
+/**
+ * 分类 Tab 配置：全部 + 各类别 + 未知兜底
+ * @description 顺序取自 WEAPON_CATEGORY_ORDER，与「全部」列表的排序同源；
+ *              此前手写 Tab 漏了「特殊武器」，导致战术复合弓在任何分类下都筛不到
+ */
 const TABS: { label: string; icon: (cls: string) => React.ReactNode }[] = [
   { label: '全部', icon: (c) => <IconGrid className={c} /> },
-  { label: '步枪', icon: (c) => <IconRifle className={c} /> },
-  { label: '冲锋枪', icon: (c) => <IconSmg className={c} /> },
-  { label: '精确射手步枪', icon: (c) => <IconDmr className={c} /> },
-  { label: '狙击步枪', icon: (c) => <IconSniper className={c} /> },
-  { label: '轻机枪', icon: (c) => <IconLmg className={c} /> },
-  { label: '霰弹枪', icon: (c) => <IconShotgun className={c} /> },
-  { label: '手枪', icon: (c) => <IconPistol className={c} /> },
+  ...WEAPON_CATEGORY_ORDER.map((label) => ({
+    label,
+    icon: CATEGORY_ICONS[label] ?? ((c: string) => <IconUnknown className={c} />),
+  })),
   { label: '未知', icon: (c) => <IconUnknown className={c} /> },
 ];
 

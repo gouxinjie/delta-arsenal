@@ -9,9 +9,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getAllWeapons, getAmmoOfWeapon, getRelatedWeapons, getWeapon } from '@/lib/db';
-import { computeStatMax, parseWeaponPanel, toWeaponDetail } from '@/lib/view';
+import { computeStatMax, parseWeaponPanel, toSlotChips, toWeaponDetail } from '@/lib/view';
 import { WEAPON_BAR_STAT_KEYS, WEAPON_STAT_META, WEAPON_VALUE_ROW_KEYS } from '@/constants/weapon';
-import { SLOT_NAMES } from '@/constants/game';
 import AmmoTile from '@/components/commons/AmmoTile';
 import SectionTitle from '@/components/commons/SectionTitle';
 import SmartImage from '@/components/commons/SmartImage';
@@ -198,12 +197,14 @@ export default async function WeaponDetail({ params }: { params: Promise<{ id: s
         <SectionTitle as="h2" title="可改装槽位" count={slots.length} />
         {slots.length ? (
           <div className="flex flex-wrap gap-1.5">
-            {slots.map((s) => (
+            {/* 同名槽位合并计数（与图鉴抽屉同一口径，见 lib/view 的 toSlotChips） */}
+            {toSlotChips(slots).map((chip) => (
               <span
-                key={s}
+                key={chip.key}
                 className="num rounded border border-edge bg-bg/40 px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/60 hover:bg-panel-hi hover:text-main"
               >
-                {SLOT_NAMES[s] ?? `槽位 ${s}`}
+                {chip.label}
+                {chip.count > 1 ? ` ×${chip.count}` : ''}
               </span>
             ))}
           </div>

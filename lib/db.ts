@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
+import { WEAPON_CATEGORY_ORDER } from '@/constants/weapon';
 import type { AmmoRow, AmmoWeaponBrief } from '@/types/ammo';
 import type { WeaponRow } from '@/types/weapon';
 
@@ -79,10 +80,17 @@ export function getAmmoWeaponMap(): Record<string, AmmoWeaponBrief[]> {
 
 /**
  * 读取全部武器
- * @returns 武器列表（按类别、名称排序）
+ * @description 排序按 WEAPON_CATEGORY_ORDER 的展示顺序（与图鉴 Tab 同源）。
+ *              直接用 `ORDER BY category` 走的是 SQLite 二进制排序，会出现
+ *              「冲锋枪→手枪→步枪」这类与 Tab 不一致的顺序。
+ * @returns 武器列表（按类别展示顺序、名称排序）
  */
 export function getAllWeapons(): WeaponRow[] {
-  return db().prepare('SELECT * FROM weapons ORDER BY category, name').all() as WeaponRow[];
+  const cases = WEAPON_CATEGORY_ORDER.map((_, i) => `WHEN ? THEN ${i + 1}`).join(' ');
+  // 未登记的类别统一排到末尾（rank 99），新增类别只在 constants 补一行
+  return db()
+    .prepare(`SELECT * FROM weapons ORDER BY CASE category ${cases} ELSE 99 END, name`)
+    .all(...WEAPON_CATEGORY_ORDER) as WeaponRow[];
 }
 
 /**

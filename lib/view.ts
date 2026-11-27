@@ -9,6 +9,7 @@
 
 import { parseAmmoEffects } from '@/lib/ammo-effects';
 import { parseJson } from '@/lib/json';
+import { SLOT_NAMES } from '@/constants/game';
 import { WEAPON_BAR_STAT_KEYS } from '@/constants/weapon';
 import type { AmmoRow, AmmoView, AmmoWeaponBrief } from '@/types/ammo';
 import type { WeaponAmmoBrief, WeaponDetail, WeaponNumericKey, WeaponPanel, WeaponRow } from '@/types/weapon';
@@ -76,6 +77,39 @@ export function parseWeaponPanel(raw: string | null | undefined): WeaponPanel {
 export function parseWeaponSlots(raw: string | null | undefined): string[] {
   const parsed = parseJson<unknown>(raw, []);
   return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+}
+
+/**
+ * 槽位芯片：同一槽位名合并计数
+ * @description 护木上的导轨挂载点是多个独立编号但同名（如 M4A1 有 6 个「导轨」），
+ *              逐个罗列会得到一屏重复标签，这里按名称合并并给出数量
+ */
+export interface SlotChip {
+  /** 原始槽位编号（合并后取首个，用作 React key） */
+  key: string;
+  /** 槽位名；字典未登记的编号回退为「槽位 N」 */
+  label: string;
+  /** 该名称下的槽位数量 */
+  count: number;
+}
+
+/**
+ * 槽位编号数组 -> 展示用芯片
+ * @param slots - 槽位编号数组（weapons.slots 解析结果）
+ * @returns 按首次出现顺序排列的芯片数组
+ */
+export function toSlotChips(slots: string[]): SlotChip[] {
+  const groups = new Map<string, SlotChip>();
+  for (const id of slots) {
+    const label = SLOT_NAMES[id] ?? `槽位 ${id}`;
+    const hit = groups.get(label);
+    if (hit) {
+      hit.count += 1;
+      continue;
+    }
+    groups.set(label, { key: id, label, count: 1 });
+  }
+  return [...groups.values()];
 }
 
 /**
