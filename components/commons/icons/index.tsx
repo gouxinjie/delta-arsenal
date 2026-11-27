@@ -227,3 +227,43 @@ export function IconCross({ className }: IconProps) {
     </svg>
   );
 }
+
+/** 扳手（改枪码页头 / 首页入口） */
+export function IconWrench({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z" />
+    </svg>
+  );
+}
+
+/** 复制（改枪码卡片复制按钮） */
+export function IconCopy({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+/** 硬币（改枪码卡片价格前缀） */
+export function IconCoin({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="5" strokeOpacity="0.45" />
+      <path d="M12 9.2v5.6M10.2 11.2h3.6M10.2 13.2h3.6" strokeOpacity="0.85" />
+    </svg>
+  );
+}
+
+/** 重置（筛选条件复位） */
+export function IconReset({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 2.7-6.4" />
+      <path d="M3 4v5h5" />
+    </svg>
+  );
+}

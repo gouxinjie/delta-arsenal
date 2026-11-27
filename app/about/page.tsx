@@ -10,7 +10,7 @@ export default function AboutPage() {
       <div className="max-w-3xl space-y-6 text-sm leading-relaxed">
         <section>
           <p className="text-muted">
-            提供<strong className="text-main">弹药穿透/伤害数据、武器面板图鉴、穿甲对照矩阵</strong>三个核心功能。
+            提供<strong className="text-main">弹药穿透/伤害数据、武器面板图鉴、穿甲对照矩阵、玩家改枪码</strong>四个核心功能。
             目标很简单：出局之前，查完再走。
           </p>
         </section>

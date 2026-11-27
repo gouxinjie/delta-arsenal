@@ -1,6 +1,6 @@
 # 三角洲军械库（Delta Arsenal）
 
-《三角洲行动》非官方玩家工具站：弹药数据库 + 武器图鉴 + 穿甲对照矩阵。
+《三角洲行动》非官方玩家工具站：弹药数据库 + 武器图鉴 + 穿甲对照矩阵 + 改枪码。
 
 > 本站为非官方粉丝站，与《三角洲行动》官方无关。所有数据仅供玩家参考，请以游戏内实测为准。
 
@@ -9,6 +9,7 @@
 - **穿甲对照矩阵**：弹种 × 护甲等级速查，三色判定，出装前快速确认带几级弹。
 - **弹药库**：全口径弹药数据，含穿透等级、伤害倍率、适用枪械。
 - **武器图鉴**：收录枪械面板、口径、可改装槽位与官方图。
+- **改枪码**：玩家整理的开火方案（烽火地带 / 全面战场），按改装总价排序，一键复制改枪码；数据真源为 `constants/build-codes.json`（人工维护，不进 SQLite），站内 `/builds/new` 提供录入器，可导出合并后的数据文件。
 - **搜索索引**：前端全文搜索（`public/search-index.json`）。
 
 ## 技术栈
@@ -65,7 +66,7 @@ pnpm run typecheck
 app/                  Next.js 路由
 components/commons/   公共组件（每组件独立文件夹 + index.tsx）
 hooks/                通用前端行为 Hook（useOverlay：滚动锁定 / Esc / 焦点陷阱）
-constants/            游戏常量与站点常量（含口径图标真源 caliber-icons.json）
+constants/            游戏常量与站点常量（含口径图标真源 caliber-icons.json、改枪码真源 build-codes.json）
 lib/                  数据库读取层（db.ts）
 scripts/              sync.mjs 等脚本
 data/                 delta.db（入库，生成物）

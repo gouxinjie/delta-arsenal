@@ -78,6 +78,14 @@
   /* 穿透徽章底 */
   --chip-bg: rgba(0, 0, 0, 0.3);
 
+  /* 方案标签补充色调：语义色令牌（accent、t2-t5、info、danger、warn）之外再补粉、青两档，
+     让 10 个预置玩法标签两两可辨；底色与描边的透明度由组件侧的工具类控制 */
+  --tone-pink: #f472b6;
+  --tone-cyan: #22d3ee;
+
+  /* 缩略图槽底：比卡片面（--panel）深一档，制造「凹槽」层次；暗色沿用页面底色 */
+  --thumb-slot: #0a0f15;
+
   /* 穿甲矩阵单元格底 */
   --ok-bg: rgba(74, 222, 128, 0.05);
   --warn-bg: rgba(255, 201, 77, 0.14);
@@ -148,6 +156,13 @@
 
   --chip-bg: rgba(16, 24, 40, 0.04);
 
+  /* 方案标签补充色调：浅色主题压暗成深粉 / 深青，保证白底上的对比度 */
+  --tone-pink: #be185d;
+  --tone-cyan: #0e7490;
+
+  /* 缩略图槽底：白卡片上必须比页面底（#f5f7fa）再深一档，否则与卡片面无区分 */
+  --thumb-slot: #e9eef6;
+
   --ok-bg: rgba(21, 128, 61, 0.08);
   --warn-bg: rgba(180, 83, 9, 0.09);
   --bad-bg: rgba(198, 40, 40, 0.07);
@@ -169,6 +184,9 @@
   --color-t5: var(--t5);
   --color-danger: var(--danger);
   --color-warn: var(--warn);
+  --color-tone-pink: var(--tone-pink);
+  --color-tone-cyan: var(--tone-cyan);
+  --color-thumb-slot: var(--thumb-slot);
   --font-mono: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
 }
 

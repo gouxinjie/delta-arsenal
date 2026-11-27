@@ -16,6 +16,7 @@ const STATIC_ROUTES: { path: string; priority: number }[] = [
   { path: '/ammo/matrix', priority: 0.9 },
   { path: '/ammo', priority: 0.8 },
   { path: '/weapons', priority: 0.8 },
+  { path: '/builds', priority: 0.8 },
   { path: '/about', priority: 0.3 },
 ];
 

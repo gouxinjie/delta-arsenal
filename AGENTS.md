@@ -36,6 +36,7 @@ pnpm run lint       # ESLint
 | 弹药全字段（118 条） | `AVA-2568/delta-gun-tierlist@main` 的 `data/game/ammo.json`（经 jsDelivr） | `ammo_item_id` 与枪械表 objectID 直接对应；含 `penetration_matrix`（每级甲穿透判定），矩阵页数据现成 |
 | 枪械面板 + 官方图（47 把） | `jiansenc/DeltaForceData@main` 的 `public/json/gun/gunRifle.json`（经 jsDelivr） | `gunDetail.ammo[].objectID` 用于建立弹药↔武器关联 |
 | 武器补充（68 把） | npm 包 `delta-force-core`（本地，无网络） | 按名称补 DFD 缺失的枪，面板字段略少 |
+| 改枪码（人工维护） | `constants/build-codes.json` | 本站整理 + 公开攻略转载（卡片标注作者与来源）；**不进 SQLite**，`/builds/new` 录入器导出合并 JSON |
 | 图片 | `playerhub.df.qq.com`（腾讯 CDN） | **构建期下载到 `/public/img/`，禁止热链** |
 
 - `tmp/*_cache.json` 是拉取失败的本地回退缓存；**sync 失败优先检查缓存新鲜度**

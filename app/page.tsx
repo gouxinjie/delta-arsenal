@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { getSiteMeta } from '@/lib/site-meta';
+import { getBuildCodeSummary } from '@/lib/build-codes';
 import { formatCount } from '@/lib/format';
-import { IconChart, IconAmmo, IconBook, IconUnknown } from '@/components/commons/icons';
+import { IconChart, IconAmmo, IconBook, IconWrench } from '@/components/commons/icons';
 
 /**
  * @page Home
@@ -14,8 +15,8 @@ import { IconChart, IconAmmo, IconBook, IconUnknown } from '@/components/commons
 
 /** 首页入口卡片配置 */
 interface EntranceCard {
-  /** 目标路由；二期未上线功能不设跳转目标 */
-  href?: string;
+  /** 目标路由 */
+  href: string;
   /** 卡片角标（英文代号） */
   tag: string;
   /** 标题 */
@@ -30,25 +31,15 @@ interface EntranceCard {
   span: string;
   /** 是否核心模块：图标框与标题走高亮强调色 */
   core?: boolean;
-  /** 是否二期功能：整体降低视觉权重，不做 hover 抬升 */
-  soon?: boolean;
 }
 
 /**
- * 入口卡片外壳：有目标路由渲染为可点击链接，二期未上线模块渲染为不可交互容器
- * （未上线功能若仍包一层链接，会出现「点击敬请期待却跳到其他页面」的矛盾）
- * @param props.href - 目标路由，缺省表示功能未上线
+ * 入口卡片外壳：统一渲染为可点击链接（模块均已上线，不再有「敬请期待」占位卡）
+ * @param props.href - 目标路由
  * @param props.className - 卡片样式类
  * @param props.children - 卡片内容
  */
-function CardShell({ href, className, children }: { href?: string; className: string; children: ReactNode }) {
-  if (!href) {
-    return (
-      <div className={className} aria-disabled="true">
-        {children}
-      </div>
-    );
-  }
+function CardShell({ href, className, children }: { href: string; className: string; children: ReactNode }) {
   return (
     <Link href={href} className={className}>
       {children}
@@ -340,6 +331,8 @@ function MatrixPreview() {
 export default function Home() {
   // 元信息解析 / 计数与日期兜底集中在 lib/site-meta（与页脚共用），数据库缺失时各字段显示「—」
   const { counts, season, datasetVersion, updatedAt, sourcesRaw } = getSiteMeta();
+  // 改枪码为人工整理内容（不进数据库），只取数量用于入口卡片文案
+  const buildSummary = getBuildCodeSummary();
 
   const sources = parseSources(sourcesRaw);
 
@@ -373,14 +366,13 @@ export default function Home() {
       span: '',
     },
     {
-      // 二期功能：不设 href，渲染为不可点击卡片，避免误导跳转
-      tag: 'SOON',
+      href: '/builds',
+      tag: 'BUILD',
       title: '改枪码',
-      desc: '二期上线，敬请期待。',
-      short: '二期上线，敬请期待。',
-      icon: <IconUnknown className="h-5 w-5 sm:h-7 sm:w-7" />,
+      desc: `收录 ${formatCount(buildSummary.total)} 套玩家改枪方案：改装总价、玩法标签与手感备注一目了然，一键复制进游戏载入。`,
+      short: `${formatCount(buildSummary.total)} 套改枪方案，一键复制`,
+      icon: <IconWrench className="h-5 w-5 sm:h-7 sm:w-7" />,
       span: 'col-span-2 sm:col-span-2 lg:col-span-2',
-      soon: true,
     },
   ];
 
@@ -414,7 +406,7 @@ export default function Home() {
             情报，永远比子弹先到一步。
           </p>
           <p className="mt-1.5 max-w-[520px] text-[13px] leading-relaxed text-muted/70 sm:text-sm">
-            弹药全字段、枪械面板与穿甲判定，构建期直读社区数据源，撤离前查这一站。
+            弹药全字段、枪械面板、穿甲判定与玩家改枪码，构建期直读社区数据源，撤离前查这一站。
           </p>
 
           {/* 主 CTA */}
@@ -494,43 +486,29 @@ export default function Home() {
             </span>
           </div>
           <p className="text-[12px] leading-relaxed text-muted/60 sm:text-[13px]">
-            穿甲矩阵、弹药库、武器图鉴已上线，改枪码二期开放；数据构建期入库，点开即查。
+            穿甲矩阵、弹药库、武器图鉴与改枪码均已上线；数据构建期入库，点开即查。
           </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           {cards.map((c, i) => (
             <CardShell
-              key={c.href ?? c.title}
+              key={c.href}
               href={c.href}
-              className={`tac-panel tac-panel-plain group relative flex flex-col overflow-hidden rounded-xl p-3.5 sm:p-5 ${c.span} ${
-                c.soon ? 'opacity-70 hover:border-edge' : 'tac-hover-flat'
-              }`}
+              className={`tac-panel tac-panel-plain tac-hover-flat group relative flex flex-col overflow-hidden rounded-xl p-3.5 sm:p-5 ${c.span}`}
             >
               {/* hover 时从右上角晕开的强调色光斑 */}
-              {!c.soon && (
-                <span
-                  className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                  style={{
-                    background:
-                      'radial-gradient(120% 90% at 100% 0%, var(--accent-dim), transparent 62%)',
-                  }}
-                  aria-hidden="true"
-                />
-              )}
+              <span
+                className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                style={{
+                  background:
+                    'radial-gradient(120% 90% at 100% 0%, var(--accent-dim), transparent 62%)',
+                }}
+                aria-hidden="true"
+              />
 
               {/* 三色判定示意（仅核心卡） */}
               {c.core && <MatrixPreview />}
-
-              {/* 二期功能卡：右侧状态水印，移动端也保留，用来补足整行卡片的右侧留白 */}
-              {c.soon && (
-                <span
-                  className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 select-none num text-[40px] font-bold leading-none tracking-[0.12em] text-accent/[0.06] sm:right-6 sm:text-[64px]"
-                  aria-hidden="true"
-                >
-                  SOON
-                </span>
-              )}
 
               <div className="relative flex items-start justify-between gap-3">
                 <span
@@ -547,11 +525,8 @@ export default function Home() {
                 </span>
               </div>
 
-              {/* 二期卡的角标在移动端隐藏：标题旁已有「二期上线」说明，省一行高度 */}
               <span
-                className={`badge relative mt-3 w-fit sm:mt-5 ${c.core ? 'border-accent/40 text-accent' : ''} ${
-                  c.soon ? '!hidden sm:!inline-flex' : ''
-                }`}
+                className={`badge relative mt-3 w-fit sm:mt-5 ${c.core ? 'border-accent/40 text-accent' : ''}`}
               >
                 {c.tag}
                 {c.core && ' ★'}
@@ -570,17 +545,11 @@ export default function Home() {
                 <span className="hidden sm:inline">{c.desc}</span>
               </p>
 
-              <span
-                className={`relative mt-auto items-center gap-1.5 pt-3 text-xs tracking-[0.16em] sm:pt-5 sm:text-[13px] ${
-                  c.soon ? 'hidden sm:flex num text-muted/60' : 'flex num text-muted group-hover:text-accent'
-                }`}
-              >
-                {c.soon ? 'COMING SOON' : '进入模块'}
-                {!c.soon && (
-                  <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">
-                    →
-                  </span>
-                )}
+              <span className="relative mt-auto flex items-center gap-1.5 pt-3 text-xs tracking-[0.16em] text-muted group-hover:text-accent sm:pt-5 sm:text-[13px]">
+                进入模块
+                <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">
+                  →
+                </span>
               </span>
             </CardShell>
           ))}

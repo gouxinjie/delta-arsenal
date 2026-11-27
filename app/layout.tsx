@@ -24,19 +24,19 @@ export const metadata: Metadata = {
     template: '%s | 三角洲军械库',
   },
   description:
-    '三角洲行动非官方军械数据速查站：全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵。撤离前先查这一站。',
+    '三角洲行动非官方军械数据速查站：全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵、玩家改枪码。撤离前先查这一站。',
   applicationName: '三角洲军械库',
   openGraph: {
     type: 'website',
     siteName: '三角洲军械库',
     locale: 'zh_CN',
     title: '三角洲军械库 — 三角洲行动弹药与武器数据速查',
-    description: '全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵，构建期直读社区数据源。',
+    description: '全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵、玩家改枪码，构建期直读社区数据源。',
   },
   twitter: {
     card: 'summary',
     title: '三角洲军械库 — 三角洲行动弹药与武器数据速查',
-    description: '全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵。',
+    description: '全弹种穿透伤害数据、武器面板图鉴、穿甲对照矩阵、玩家改枪码。',
   },
   // 站点图标走 public 固定路径而非 app/icon.svg 文件约定：
   // 文件约定生成的 URL 由内容 hash 决定，浏览器 favicon 缓存不遵守 HTTP 缓存头，换 URL 才能可靠失效

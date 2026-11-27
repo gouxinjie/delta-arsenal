@@ -17,6 +17,7 @@ const NAV = [
   { href: '/ammo/matrix', label: '穿甲对照' },
   { href: '/ammo', label: '弹药库' },
   { href: '/weapons', label: '武器图鉴' },
+  { href: '/builds', label: '改枪码' },
   { href: '/about', label: '关于' },
 ];
 
